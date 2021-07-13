@@ -1,0 +1,20 @@
+`timescale 1ns/1ps        
+
+ module cpu_test();
+ 
+ reg clk;
+ 
+ wire [31:0] in,ad,alu;
+ 
+ initial
+ begin
+ clk=0;
+ end
+ 
+
+
+always #10 clk=~clk;
+
+cpu_jh u2 (clk,clk,clk,clk,clk);
+
+endmodule

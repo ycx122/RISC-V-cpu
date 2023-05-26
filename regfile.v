@@ -3,12 +3,12 @@ output reg [31:0]data1,
 output reg [31:0]data2,
 input clk,
 input [31:0]write_data,
-input [4:0]w_a,
-input [4:0]r1_a,
-input [4:0]r2_a,
-input w_ce
+input [4:0]write_addr,
+input [4:0]read_1_addr,
+input [4:0]read_2_addr,
+input write_ce
 );
-reg reg0=0;
+reg reg_0=0;
 reg [31:0] regs [31:1];
 reg [10:0]i;
 
@@ -16,13 +16,15 @@ initial
 begin
 for(i=1;i<32;i=i+1)
 	regs[i]=0;
+	
+regs[2]=32'h2000_7000;
 end
 
 always@(posedge clk)
-if (w_ce==1)
+if (write_ce==1)
 begin
-	case(w_a)
-		0:reg0<=0;
+	case(write_addr)
+		0:reg_0<=0;
 		1:regs[1]<=write_data;
 		2:regs[2]<=write_data;
 		3:regs[3]<=write_data;
@@ -59,8 +61,8 @@ end
 
 		
 always@(*)
-case(r1_a)
-		0:data1<=reg0;
+case(read_1_addr)
+		0:data1<=reg_0;
 		1:data1<=regs[1];
 		2:data1<=regs[2];
 		3:data1<=regs[3];
@@ -96,8 +98,8 @@ case(r1_a)
 endcase
 
 always@(*)
-case(r2_a)
-		0:data2<=reg0;
+case(read_2_addr)
+		0:data2<=reg_0;
 		1:data2<=regs[1];
 		2:data2<=regs[2];
 		3:data2<=regs[3];

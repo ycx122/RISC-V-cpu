@@ -28,12 +28,16 @@ module clnt(
     input we,
     input [2:0] clnt_addr,
     input [31:0] din,
-    output reg [31:0] dout
+    output reg [31:0] dout,
+    output clnt_ready,
+    output reg time_e_inter
     );
     
     reg [63:0] mtime=0;
-    reg [63:0] mtime_cmp=64'h0000_0000_0000_0C350;//0.001s
+    reg [63:0] mtime_cmp=64'h0000_0000_02FA_F080;//64'h0000_0000_02FA_F080;//64'h0000_0000_0000_C350;//0.001s
     reg [31:0] clnt_flag=0;
+    
+    assign clnt_ready=clnt_en;
     
     
     always@(*)
@@ -61,7 +65,7 @@ module clnt(
     
    always@(posedge clk)
         if(rst_n==0)
-            mtime_cmp=0;
+            mtime_cmp=64'h0000_0000_02FA_F080;
         else if(clnt_addr==2 && clnt_en==1 && we==1)
             mtime_cmp={mtime_cmp[63:32],din};
         else if(clnt_addr==3 && clnt_en==1 && we==1)
@@ -72,12 +76,14 @@ module clnt(
             clnt_flag=0;
         else if(clnt_addr==4 && clnt_en==1 && we==1)
             clnt_flag=din;  
-        else if(mtime>=mtime_cmp)           
-            clnt_flag=1;
-        else if(mtime<mtime_cmp)           
-            clnt_flag=0;
-    
-    
+
+    always@(posedge clk)
+        if(rst_n==0)
+            time_e_inter=0;
+        else if(mtime_cmp==mtime)
+            time_e_inter=clnt_flag;
+        else
+            time_e_inter=0;
     
     
     

@@ -19,20 +19,19 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module ram_c(
     input clk,
     input i_en,
     input d_en,         //data_en
-    input [31:0] d_addr,
+    input [31:0] d_addr,//
     input [31:0] i_addr,   
-    input [31:0] d_data_in,
-    input [2:0] mem_op,
+    input [31:0] d_data_in,//
+    input [2:0] mem_op,//
     input we,           //write_en
     input re,
     
     output reg [31:0] d_data_out,
-    output [31:0] i_data,
+    output  [31:0] i_data,
     output ram_ready,
     
     
@@ -109,26 +108,21 @@ module ram_c(
     always@(*)    
         if(mem_op[2]==0 && re==1 && d_en==1)
             begin
-            if(mem_op==0)
-                d_data_out={zero,zero,zero,d_o0};
-            else if(mem_op==1)
-                d_data_out={zero,zero,d_o1,d_o0};
-            else if(mem_op==2)
+            if(mem_op==0)                    //lb
+                d_data_out=(d_o0[7]==1)?{24'hff_ff_ff,d_o0}:{zero,zero,zero,d_o0};
+            else if(mem_op==1)               //lh
+                d_data_out=(d_o1[7]==1)?{16'hff_ff,d_o1,d_o0}:{zero,zero,d_o1,d_o0};
+            else if(mem_op==2)                //lw
                 d_data_out={d_o3,d_o2,d_o1,d_o0};
             else
                 d_data_out=0;
             end
         else if(mem_op[2]==1 && re==1 && d_en==1)
             begin
-            if(mem_op[0]==0)
-                begin
-                if((d_o0[7]==1))
-                    d_data_out={24'hff_ff_ff,d_o0};
-                else
-                    d_data_out={zero,zero,zero,d_o0};
-                end
-            else if(mem_op[0]==1)
-                d_data_out=(d_o1[7]==1)?{16'hff_ff,d_o1,d_o0}:{zero,zero,d_o1,d_o0};
+            if(mem_op[0]==0)                        //lbu
+                d_data_out={zero,zero,zero,d_o0};
+            else if(mem_op[0]==1)                    //lhu
+                d_data_out={zero,zero,d_o1,d_o0};
             else
                 d_data_out=0;
             end
@@ -199,20 +193,20 @@ module ram_c(
             
                 begin
 
-                addr_ram1=d_addr[15:2]+1;
-                addr_ram2=d_addr[15:2];
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2]+1;
+                addr_ram2=d_addr[16:2];
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
                 
                 end
                 
             else
             
                 begin
-                addr_ram1=d_addr[15:2];
-                addr_ram2=d_addr[15:2];
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2];
+                addr_ram2=d_addr[16:2];
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
                 end
                 
             end
@@ -221,39 +215,39 @@ module ram_c(
             if(d_addr[1:0]==1)
                 
                 begin
-                addr_ram1=d_addr[15:2]+1;
-                addr_ram2=d_addr[15:2];
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2]+1;
+                addr_ram2=d_addr[16:2];
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
                 end
             else if(d_addr[1:0]==2)
                 
                 begin
-                addr_ram1=d_addr[15:2]+1;
-                addr_ram2=d_addr[15:2]+1;
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2]+1;
+                addr_ram2=d_addr[16:2]+1;
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
                 end  
             else if(d_addr[1:0]==3)
                 
                 begin
-                addr_ram1=d_addr[15:2]+1;
-                addr_ram2=d_addr[15:2]+1;
-                addr_ram3=d_addr[15:2]+1;
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2]+1;
+                addr_ram2=d_addr[16:2]+1;
+                addr_ram3=d_addr[16:2]+1;
+                addr_ram4=d_addr[16:2];
                 end 
             else
-                addr_ram1=d_addr[15:2];
-                addr_ram2=d_addr[15:2];
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2];
+                addr_ram2=d_addr[16:2];
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
             end
         else 
             begin
-                addr_ram1=d_addr[15:2];
-                addr_ram2=d_addr[15:2];
-                addr_ram3=d_addr[15:2];
-                addr_ram4=d_addr[15:2];
+                addr_ram1=d_addr[16:2];
+                addr_ram2=d_addr[16:2];
+                addr_ram3=d_addr[16:2];
+                addr_ram4=d_addr[16:2];
             end
         end
     
@@ -269,9 +263,23 @@ module ram_c(
      .de()		//Ë«±ßÑØ  
      );
 
+    //always@(*)
+    //if(i_addr==0)
+    //    i_data=32'h2000_00b7;
+    //else if(i_addr==4)
+    //    i_data=32'h0ff0_0113;
+    //else if(i_addr==8)
+    //    i_data=32'h0020_a1a3;
+    //else if(i_addr==12)
+    //    i_data=32'h0030_a183;
+    //else if(i_addr==16)
+    //    i_data=32'h0030_8203;
+    //else 
+    //    i_data=0;
 
     
-    i_rom i_rom(.clkb(clk) ,.addrb(i_addr[15:2]), .enb(i_en) ,.doutb(i_data),.dinb(0),.web(0),
+    i_rom i_rom(.clkb(clk) ,.addrb(i_addr[15:2]), .enb(i_en) ,.doutb(i_data
+    ),.dinb(0),.web(0),
     .clka(cpu_clk) ,.addra( ((rom_addr)&{16{rom_r_en}}) | ( (rom_w_addr)&{16{rom_w_en}} )    ), .ena(rom_r_en | rom_w_en) ,.douta(rom_data),.dina(uart_rx_data),.wea(rom_w_en)
     );    //only spoort int read
     //ture two port read and write ram
@@ -304,16 +312,20 @@ module ram_c(
          //   rom_w_addr=0;
     
     
-    d_ram d_ram_1(.clka(clk) ,.clkb(clk) ,.ena(w_en[0]),.enb(re) , .dina(d_in_ram1) ,.doutb(d_out_ram1) ,.addra(addr_ram1[13:0]),.addrb(addr_ram1[13:0]),.wea(w_en[0]));   
-    d_ram d_ram_2(.clka(clk) ,.clkb(clk) ,.ena(w_en[1]),.enb(re) , .dina(d_in_ram2) ,.doutb(d_out_ram2) ,.addra(addr_ram2[13:0]),.addrb(addr_ram2[13:0]),.wea(w_en[1]));  
-    d_ram d_ram_3(.clka(clk) ,.clkb(clk) ,.ena(w_en[2]),.enb(re) , .dina(d_in_ram3) ,.doutb(d_out_ram3) ,.addra(addr_ram3[13:0]),.addrb(addr_ram3[13:0]),.wea(w_en[2])); 
-    d_ram d_ram_4(.clka(clk) ,.clkb(clk) ,.ena(w_en[3]),.enb(re) , .dina(d_in_ram4) ,.doutb(d_out_ram4) ,.addra(addr_ram4[13:0]),.addrb(addr_ram4[13:0]),.wea(w_en[3]));
+    dram d_ram_1(.clka(cpu_clk) ,.clkb(cpu_clk) ,.ena(w_en[0]),.enb(re) , .dina(d_in_ram1) ,.doutb(d_out_ram1) ,.addra(addr_ram1[14:0]),.addrb(addr_ram1[14:0]),.wea(w_en[0]));   
+    dram d_ram_2(.clka(cpu_clk) ,.clkb(cpu_clk) ,.ena(w_en[1]),.enb(re) , .dina(d_in_ram2) ,.doutb(d_out_ram2) ,.addra(addr_ram2[14:0]),.addrb(addr_ram2[14:0]),.wea(w_en[1]));  
+    dram d_ram_3(.clka(cpu_clk) ,.clkb(cpu_clk) ,.ena(w_en[2]),.enb(re) , .dina(d_in_ram3) ,.doutb(d_out_ram3) ,.addra(addr_ram3[14:0]),.addrb(addr_ram3[14:0]),.wea(w_en[2])); 
+    dram d_ram_4(.clka(cpu_clk) ,.clkb(cpu_clk) ,.ena(w_en[3]),.enb(re) , .dina(d_in_ram4) ,.doutb(d_out_ram4) ,.addra(addr_ram4[14:0]),.addrb(addr_ram4[14:0]),.wea(w_en[3]));
     //simple two port ram
     //portA width 8
     //portB width 8
     
+    wire ram_ready_r;
+    wire ram_ready_w=we&d_en;
     
-    delay delay1(cpu_clk,re,we,ram_ready);
+    assign ram_ready=ram_ready_r|ram_ready_w;
+    
+    delay delay1(cpu_clk,re&d_en,0,ram_ready_r);
     
     endmodule
     
@@ -361,7 +373,7 @@ endmodule
         case(state)
             IDLE:begin
                 if(e==1)
-                    n_state=D1;
+                    n_state=D2;//D1
                 else
                     n_state=IDLE;
                 end

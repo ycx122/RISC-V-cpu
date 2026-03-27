@@ -204,13 +204,16 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 
 ### 当前仓库中的仿真现状
 
-仓库里已经有测试顶层，但没有看到这些内容：
+仓库里已经有测试顶层，并补充了一个最小冒烟脚本：
 
-- 一键运行脚本
+- `sim/smoke.sh`：使用仓库内置 RISC-V 工具链和 `iverilog/vvp` 构建一个最小 `RV32IM` 程序，再加载到 `sim/tb/cpu_test.v` 做功能仿真
+
+当前仍然没有看到这些内容：
+
 - `Makefile`
 - ModelSim `do` 脚本
 - 预置的官方测试程序集合
-- 仿真文件清单说明
+- 更通用的仿真文件清单说明
 
 目前仓库额外提供了一层 `iverilog` 兼容模型，位于 `sim/models/xilinx_compat.v`，用于给下列 Vivado IP 提供轻量级仿真替身：
 
@@ -218,7 +221,18 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 - `i_rom`
 - `div_0`
 
-因此，如果你要自己跑仿真，通常需要手动完成：
+如果你只是想先确认“工具链 + RTL + 仿真器”这条链路能跑起来，可以直接执行：
+
+`bash sim/smoke.sh`
+
+它会自动完成：
+
+1. 编译一个最小 `RV32IM` 冒烟程序
+2. 生成供 `i_rom` 加载的 Verilog hex 镜像
+3. 用 `iverilog` 编译 `sim/tb/cpu_test.v` 和所需 RTL
+4. 用 `vvp` 运行仿真并检查 `TEST_PASS`
+
+如果你要手动跑其他程序镜像，通常需要完成：
 
 1. 在仿真工具中建立工程
 2. 把 `sim/tb/cpu_test.v` 设为顶层
@@ -226,6 +240,17 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 4. 准备程序镜像或使用下载路径写入 ROM
 
 如果使用 `iverilog`/`vvp`，`i_rom` 支持通过运行参数 `+IROM=<hex文件路径>` 加载程序镜像。
+
+### ISA 测试限制与架构边界
+
+当前仓库可以用 `sw/tinyriscv/tests/isa` 里的旧版 ISA 用例做功能回归，但需要结合处理器本身的架构边界来解读结果：
+
+- 当前实现不支持 `fence.i`，因此 `rv32ui-p-fence_i` 和 `rv32Zifencei` 相关测试不适用。
+- 原因不是仿真脚本缺失，而是当前处理器没有实现 `Zifencei` 扩展；对于这种顺序执行实现，通常也没有额外的指令缓存失效需求，因此这里明确按“不支持该扩展”处理。
+- 因此在描述当前处理器支持的 ISA 时，不应把 `Zifencei` 计入已实现扩展。
+- 当前仿真链路支持通过 `+IROM=` 对 `i_rom` 进行镜像初始化，但尚未提供一套统一的 RAM 预初始化机制。
+- 这会影响部分依赖数据区预置内容的 `load` 类测试；如果 `lb/lh/lw/lbu/lhu` 等用例失败，需要先区分是“RAM 初始化能力缺失导致测试环境不成立”，还是“Load 通路本身存在设计错误”。
+- 在现阶段回归中，这类 `load` 用例更适合作为“待补齐 RAM 初始化能力后再复测”的项目，而不宜直接据此下 ISA 不兼容的最终结论。
 
 ### 除法器说明
 
@@ -283,6 +308,14 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 - [RISC-V 在线汇编工具](http://tice.sea.eseo.fr/riscv/)
 
 如果你要进行更完整的软件构建，建议使用标准 RISC-V GNU Toolchain，并结合你自己的链接脚本、镜像生成流程和 ROM 初始化方式。
+
+## 第三方代码与致谢
+
+本仓库包含并使用了来自 `tinyriscv` 的部分代码、目录结构和测试内容，当前主要保留在 `sw/tinyriscv` 目录下，并在此基础上结合本仓库的处理器实现做了裁剪、整理和适配。
+
+`sw/tinyriscv` 目录中的上游内容继续按 `Apache License 2.0` 分发，对应许可证文件保留在 `sw/tinyriscv/LICENSE`。除另有说明的第三方内容外，本仓库其余内容的许可证见根目录 `LICENSE`。
+
+同时感谢 `tinyriscv` 相关博客内容对本项目的启发，尤其是在我学习 RISC-V 软件构建与编译方案的过程中提供了很大帮助。
 
 ## 当前文档已知空缺
 

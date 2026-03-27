@@ -12,134 +12,53 @@ input [31:0]mul_div_out,
 input mul_div_ready
 );
 
-always@(*)
-begin
-	if(ju_c==0 & mul_div_ready==0)
-		begin
-		ju_out=alu_out;
-		pc_c=0;
-		b_im_out=0;
+reg branch_taken;
+reg branch_valid;
+
+always @(*) begin
+	branch_taken = 1'bx;
+	branch_valid = 1'b1;
+
+	case(mem_op)
+		3'd0: branch_taken = (alu_out == 0);
+		3'd1: branch_taken = (alu_out != 0);
+		3'd4,
+		3'd6: branch_taken = alu_out[0];
+		3'd5,
+		3'd7: branch_taken = ~alu_out[0];
+		default: branch_valid = 1'b0;
+	endcase
+end
+
+always @(*) begin
+	if(ju_c==0) begin
+		ju_out = (mul_div_ready==1'b1) ? mul_div_out : alu_out;
+		pc_c = 0;
+		b_im_out = 0;
+	end
+	else if(ju_c==1) begin    // b
+		if(branch_valid==1'b1) begin
+			ju_out = 0;
+			pc_c = branch_taken ? 2 : 0;
+			b_im_out = branch_taken ? im_in : 0;
 		end
-	else if(ju_c==0 & mul_div_ready==1)
-		begin
-		ju_out=mul_div_out;
-		pc_c=0;
-		b_im_out=0;
+		else begin
+			ju_out = {{32{1'bx}}};
+			pc_c = {1'bx,1'bx};
+			b_im_out = {{13{1'bx}}};
 		end
-	else if(ju_c==1)     //b
-		begin
-			case(mem_op)
-			0:	
-			begin
-			if(alu_out==0)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			1:
-			begin
-			if(alu_out!=0)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			4:
-			begin
-			if(alu_out[0]==1)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			5://eero
-			begin
-			if(alu_out[0]==0)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			6:
-			begin
-			if(alu_out[0]==1)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			7:
-			begin
-			if(alu_out[0]==0)
-				begin
-				ju_out=0;
-				pc_c=2;
-				b_im_out=im_in;
-				end
-			else
-				begin
-				ju_out=0;				
-				pc_c=0;
-				b_im_out=0;
-				end
-			end
-			default:		
-			begin
-			ju_out={{32{1'bx}}};
-			pc_c={1'bx,1'bx};
-			b_im_out={{13{1'bx}}};
-			end
-			endcase
-		end
-	else if(ju_c==2)   //jal
-		begin
-			ju_out=pc_addr;
-			pc_c=0;
-			b_im_out=0;
-		end
-	else
-		begin
-			ju_out={{32{1'bx}}};
-			pc_c={1'b0,1'b0};
-			b_im_out={{13{1'bx}}};
-		end
-end	
+	end
+	else if(ju_c==2) begin   // jal
+		ju_out = pc_addr;
+		pc_c = 0;
+		b_im_out = 0;
+	end
+	else begin
+		ju_out = {{32{1'bx}}};
+		pc_c = {1'b0,1'b0};
+		b_im_out = {{13{1'bx}}};
+	end
+end
 
 endmodule
 		

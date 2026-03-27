@@ -1,0 +1,16 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.bin
+*.coe
+*.dis
+*.dump
+*.elf
+*.elf.objdump
+*.verilog
+
+__pycache__/
+tests/.git/
+tests/isa/generated/
+tests/riscv-compliance/build_generated/

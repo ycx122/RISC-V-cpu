@@ -61,6 +61,8 @@ wire [63:0]div_output;
 
 wire [31:0]div_result=div_output[63:32];
 wire [31:0]rem_result=div_output[31:0];
+wire div_zero = (op2 == 32'b0);
+wire div_overflow = (op1 == 32'h8000_0000) && (op2 == 32'hffff_ffff);
 
 wire div_ready;
 wire div_valid;
@@ -75,7 +77,7 @@ div_state_machine dsm_0(
     
     mul mul_test(
     .clk(clk),
-    .rst(0),
+    .rst(1'b0),
     .en(mul|mulh|mulhsu|mulhu),
     
     .din1(mul_din1),
@@ -106,13 +108,23 @@ always@(*)
     else if(mulhu==1)
         mul_div_output<=mul_output[63:32];
     else if(div==1)
-        mul_div_output<=(op1_neg^op2_neg)?-div_result:div_result;
+        if(div_zero)
+            mul_div_output<=32'hffff_ffff;
+        else if(div_overflow)
+            mul_div_output<=32'h8000_0000;
+        else
+            mul_div_output<=(op1_neg^op2_neg)?-div_result:div_result;
     else if(divu==1)
-        mul_div_output<=div_result;
+        mul_div_output<=div_zero ? 32'hffff_ffff : div_result;
     else if(rem==1)
-        mul_div_output<=(op1_neg)?-rem_result:rem_result;
+        if(div_zero)
+            mul_div_output<=op1;
+        else if(div_overflow)
+            mul_div_output<=32'h0000_0000;
+        else
+            mul_div_output<=(op1_neg)?-rem_result:rem_result;
     else if(remu==1)
-        mul_div_output<=rem_result;
+        mul_div_output<=div_zero ? op1 : rem_result;
     else
         mul_div_output<=0;
         

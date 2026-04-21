@@ -45,98 +45,99 @@ module cpu_uart(
 
     always@(posedge clk)
         if(rst_n==0)
-        empty_delay=0;
+        empty_delay<=0;
         else
-        empty_delay=empty;
+        empty_delay<=empty;
         
     always@(posedge clk)
         if(rst_n==0)
-            uart_r_data_reg=0;
+            uart_r_data_reg<=0;
         else if(fifo_0_r_pos_delay==1)
-            uart_r_data_reg=(empty_delay==1)?9'b1_0000_0000:{1'b0,uart_r_data};
+            uart_r_data_reg<=(empty_delay==1)?9'b1_0000_0000:{1'b0,uart_r_data};
         else if(ram_ready==1)
-            uart_r_data_reg=0;
+            uart_r_data_reg<=0;
 
         
     always@(posedge clk)
         if(rst_n==0)
-        tx_en_delay=0;
+        tx_en_delay<=0;
         else
-        tx_en_delay=tx_en;
+        tx_en_delay<=tx_en;
         
     always@(posedge clk)
         if(rst_n==0)
-        fifo_0_r_pos_delay=0;
+        fifo_0_r_pos_delay<=0;
         else
-        fifo_0_r_pos_delay=fifo_0_r_pos;
+        fifo_0_r_pos_delay<=fifo_0_r_pos;
     
      uart_rx uart_rx(
-	.sys_clk(clk),			//50M系统时钟
-	.sys_rst_n(rst_n),			//系统复位
-	.uart_rxd(rx),			//接收数据线
-	.uart_rx_done(rx_done),		//数据接收完成标志
-	.uart_rx_data(uart_rx_data)		//接收到的数据
+	.sys_clk(clk),                                  // 50 MHz system clock
+	.sys_rst_n(rst_n),                              // active-low reset
+	.uart_rxd(rx),                                  // UART RX line
+	.uart_rx_done(rx_done),                         // byte received strobe
+	.uart_rx_data(uart_rx_data)                     // received byte
 );
-    
+
      uart_tx uart_tx(
-	.sys_clk(clk),	//50M系统时钟
-	.sys_rst_n(rst_n),	//系统复位
-	.uart_data(uart_tx_data),	//发送的8位置数据
-	.uart_tx_en(tx_en_delay),	//发送使能信号
-	.uart_txd(tx)	//串口发送数据线
- 
+	.sys_clk(clk),                                  // 50 MHz system clock
+	.sys_rst_n(rst_n),                              // active-low reset
+	.uart_data(uart_tx_data),                       // byte to send
+	.uart_tx_en(tx_en_delay),                       // TX enable pulse
+	.uart_txd(tx)                                   // UART TX line
 );
-     edge_detect2 edge1(  
-     .clk(clk),           
-     .signal(rx_done),        
-     .pe(rx_done_pos),		//上升沿 
-     .ne(),		//下降沿 
-     .de()		//双边沿  
+     edge_detect2 edge1(
+     .clk(clk),
+     .signal(rx_done),
+     .pe(rx_done_pos),                              // rising  edge pulse
+     .ne(),                                         // falling edge pulse (unused)
+     .de()                                          // either  edge pulse (unused)
 );
-    
-     edge_detect2 edge2(  
-     .clk(clk),           
-     .signal(fifo_1_w),        
-     .pe(fifo_1_w_pos),		//上升沿 
-     .ne(),		//下降沿 
-     .de()		//双边沿  
+
+     edge_detect2 edge2(
+     .clk(clk),
+     .signal(fifo_1_w),
+     .pe(fifo_1_w_pos),                             // rising  edge pulse
+     .ne(),                                         // falling edge pulse (unused)
+     .de()                                          // either  edge pulse (unused)
 );
-    
-     edge_detect2 edge3(  
-     .clk(clk),           
-     .signal(fifo_0_r),        
-     .pe(fifo_0_r_pos),		//上升沿 
-     .ne(),		//下降沿 
-     .de()		//双边沿  
+
+     edge_detect2 edge3(
+     .clk(clk),
+     .signal(fifo_0_r),
+     .pe(fifo_0_r_pos),                             // rising  edge pulse
+     .ne(),                                         // falling edge pulse (unused)
+     .de()                                          // either  edge pulse (unused)
 );
-        
+
+// RX FIFO: UART receiver pushes bytes in, CPU pulls them out.
 sync_fifo_cnt sync_fifo_cnt_0
 (
-	.clk(clk)		,		//系统时钟
-	.rst_n(rst_n)	,       //低电平有效的复位信号
-	.data_in(uart_rx_data)	,       //写入的数据
-	.rd_en(fifo_0_r_pos)	,       //读使能信号，高电平有效
-	.wr_en(rx_done_pos)	,       //写使能信号，高电平有效
-			
-	.data_out(uart_r_data),	    //输出的数据
-	.empty(empty)	,	    //空标志，高电平表示当前FIFO已被写满
-	.full()	       //满标志，高电平表示当前FIFO已被读空
+	.clk(clk),                                      // system clock
+	.rst_n(rst_n),                                  // active-low reset
+	.data_in(uart_rx_data),                         // write-side data
+	.rd_en(fifo_0_r_pos),                           // read  enable
+	.wr_en(rx_done_pos),                            // write enable
+
+	.data_out(uart_r_data),                         // read-side data
+	.empty(empty),                                  // FIFO empty flag
+	.full()                                         // FIFO full  flag (unused)
 
 );
     
 wire tx_empty;
  
+// TX FIFO: CPU pushes bytes in, UART transmitter pulls them out.
 sync_fifo_cnt sync_fifo_cnt_1
 (
-	.clk(clk)		,		//系统时钟
-	.rst_n(rst_n)	,       //低电平有效的复位信号
-	.data_in(uart_w_data)	,       //写入的数据
-	.rd_en(tx_en)	,       //读使能信号，高电平有效
-	.wr_en(fifo_1_w_pos)	,       //写使能信号，高电平有效
-			
-	.data_out(uart_tx_data),	    //输出的数据
-	.empty(tx_empty)	,	    //空标志，高电平表示当前FIFO已被写满
-	.full()	       //满标志，高电平表示当前FIFO已被读空
+	.clk(clk),                                      // system clock
+	.rst_n(rst_n),                                  // active-low reset
+	.data_in(uart_w_data),                          // write-side data
+	.rd_en(tx_en),                                  // read  enable
+	.wr_en(fifo_1_w_pos),                           // write enable
+
+	.data_out(uart_tx_data),                        // read-side data
+	.empty(tx_empty),                               // FIFO empty flag
+	.full()                                         // FIFO full  flag (unused)
 
 );
 
@@ -144,28 +145,28 @@ sync_fifo_cnt sync_fifo_cnt_1
     
     always@(posedge clk)
         if(rst_n==0)
-            w_cnt=0;
+            w_cnt<=0;
         else if(uart_en & w_en & ram_ready & (c!=1))
-            w_cnt=w_cnt+1;
+            w_cnt<=w_cnt+1;
         else if((w_cnt!=0) & (c==1))
-            w_cnt=w_cnt-1;
+            w_cnt<=w_cnt-1;
     
     always@(posedge clk)
         if(rst_n==0)
-            wait_cnt=0;
+            wait_cnt<=0;
         else
-            {c,wait_cnt}=wait_cnt+1;
+            {c,wait_cnt}<=wait_cnt+1;
     reg ram_ready_d1;
     reg ram_ready_d2;
     reg ram_ready_d3;
     reg ram_ready_d4;
     wire uart_en_pos;
-     edge_detect2 edge4(  
-     .clk(clk),           
-     .signal(uart_en),        
-     .pe(uart_en_pos),		//上升沿 
-     .ne(),		//下降沿 
-     .de()		//双边沿  
+     edge_detect2 edge4(
+     .clk(clk),
+     .signal(uart_en),
+     .pe(uart_en_pos),                              // rising  edge pulse
+     .ne(),                                         // falling edge pulse (unused)
+     .de()                                          // either  edge pulse (unused)
 );
     always@(posedge clk)
         if(rst_n==0)

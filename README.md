@@ -204,9 +204,10 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 
 ### 当前仓库中的仿真现状
 
-仓库里已经有测试顶层，并补充了一个最小冒烟脚本：
+仓库里已经有测试顶层，并补充了两个仿真脚本：
 
 - `sim/smoke.sh`：使用仓库内置 RISC-V 工具链和 `iverilog/vvp` 构建一个最小 `RV32IM` 程序，再加载到 `sim/tb/cpu_test.v` 做功能仿真
+- `sim/run_isa.sh`：把 `sw/tinyriscv/tests/isa/generated/` 下的 riscv-tests 镜像逐个喂给同一个 tb，跑完给出 PASS / FAIL / TIMEOUT / xfail / SKIP 汇总，供重构时做回归
 
 当前仍然没有看到这些内容：
 
@@ -241,6 +242,32 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 
 如果使用 `iverilog`/`vvp`，`i_rom` 支持通过运行参数 `+IROM=<hex文件路径>` 加载程序镜像。
 
+### ISA 回归脚本
+
+想跑完整的 rv32ui + rv32um 用例集：
+
+```
+bash sim/run_isa.sh                    # 全量
+bash sim/run_isa.sh --only 'rv32um-*'  # 只跑 M 扩展
+bash sim/run_isa.sh add sub mul        # 位置参数可作为附加过滤
+```
+
+脚本只编译一次 tb，然后依次以 `+IROM=<测试镜像>.verilog` 启动 `vvp`，按测试日志里的 `TEST_PASS` / `TEST_FAIL` 判定结果。每个用例的详细日志留在 `sim/output/isa/<名字>.log`。
+
+脚本维护两个静态名单（见文件头部注释）：
+
+- `SKIP_LIST`：依赖本实现未支持的扩展，会被直接标记 SKIP。当前为 `rv32ui-p-fence_i`。
+- `EXPECTED_FAIL_LIST`：本实现目前跑不过、但属于已知架构缺口而非最近回归的用例；它们失败时记为 `xfail`，不会让整个脚本退出非零。现在是空列表——之前挂在这里的 `rv32ui-p-s{b,h}` 已经通过 `+DRAM` 预装通道在仿真里填进 `.data` 段初值后转绿（见下方「ISA 测试限制与架构边界」），`rv32ui-p-sw` 早在 PC 语义三处 off-by-4 修完之后就转绿了。
+
+基线（把这个脚本跑绿应该看到的结果）：
+
+- 46 个 PASS
+- 0 个 xfail
+- 1 个 SKIP（`rv32ui-p-fence_i`）
+- 0 个新的 FAIL 或 TIMEOUT
+
+以后做流水线/总线这类有回归风险的改动，请先在改动前后各跑一次 `sim/run_isa.sh`，对比两边输出。退出码非零或出现 `NEW failures` / `NEW timeouts` 就是回归。
+
 ### ISA 测试限制与架构边界
 
 当前仓库可以用 `sw/tinyriscv/tests/isa` 里的旧版 ISA 用例做功能回归，但需要结合处理器本身的架构边界来解读结果：
@@ -248,9 +275,9 @@ UART 控制器位于 `rtl/peripherals/uart/cpu_uart.v`，内部带收发 FIFO。
 - 当前实现不支持 `fence.i`，因此 `rv32ui-p-fence_i` 和 `rv32Zifencei` 相关测试不适用。
 - 原因不是仿真脚本缺失，而是当前处理器没有实现 `Zifencei` 扩展；对于这种顺序执行实现，通常也没有额外的指令缓存失效需求，因此这里明确按“不支持该扩展”处理。
 - 因此在描述当前处理器支持的 ISA 时，不应把 `Zifencei` 计入已实现扩展。
-- 当前仿真链路支持通过 `+IROM=` 对 `i_rom` 进行镜像初始化，但尚未提供一套统一的 RAM 预初始化机制。
-- 这会影响部分依赖数据区预置内容的 `load` 类测试；如果 `lb/lh/lw/lbu/lhu` 等用例失败，需要先区分是“RAM 初始化能力缺失导致测试环境不成立”，还是“Load 通路本身存在设计错误”。
-- 在现阶段回归中，这类 `load` 用例更适合作为“待补齐 RAM 初始化能力后再复测”的项目，而不宜直接据此下 ISA 不兼容的最终结论。
+- `rv32ui-p-l{b,bu,h,hu,w}` 实际上是访问 `.rodata`（落在 ROM 窗口），不需要 RAM 初始化通路。仿真里之前这五个 load 测试一直 FAIL 的真实原因是 `sim/models/xilinx_compat.v` 的 `i_rom` 端口 A 是 0-cycle 组合读，而 `rtl/memory/rodata.v` 的 7-state FSM 是按 Vivado BRAM "Read-First with Output Register" 模式（2-cycle 读延迟）写的：采样字节整齐落后了 2 拍，结果是 `reg_data = {mem[0], mem[0], mem[addr+3], mem[addr+2]}`。现在 `i_rom` 端口 A 已经加了两级输出寄存器与板上行为对齐，这五个 load 测试直接转绿，无需改 `rodata.v`（改 `rodata.v` 反而会在板上炸）。
+- PC 语义三处 off-by-4：旧版 `rtl/core/id.v` 的 auipc（`(addr-4)+imm`）、`rtl/core/ju.v` 的 jal/jalr link（`pc_addr` 而非 `pc_addr+4`）、以及 `rtl/core/pc.v` 的 JALR 目标（直接用 `rs1+imm` 而不扣 1 周期取指 bubble）互相抵消，使得 `la` 算出的绝对地址恰好是 spec_target−4。对纯跳转型 test 能通过（因为取指 bubble 会自动吞掉首条指令）；但 `sw`/`sh`/`sb` 等把这个地址当数据地址用时就会落到 `0x1FFFFFFC` 这个未被 `addr2c.v` 映射的位置，总线永远不 ready。三处已同步修复（auipc=`addr+imm`、link=`pc_addr+4`、pc.v JALR=`rs1+imm-4` 补 bubble），`rv32ui-p-sw` 因此转绿。
+- `.data` 仿真预装通道：`rv32ui-p-s{b,h}` 的 `TEST_ST_OP` 用例要求 RAM 在 reset 后保留 `.data` 段初值（`0xef` / `0xbeef`）——真板上这是 crt0 从 ROM 拷到 RAM 的结果，但本 SoC 没有 boot loader。`sim/run_isa.sh` 现在会为每个用例跑一次 `riscv64-unknown-elf-objcopy -O binary -j .data <elf>` 抽出 `.data` 字节流，转 byte-per-line hex 后通过 `+DRAM=<file>` 传进 `sim/tb/cpu_test.v`；测试台在 reset 释放前用 `$readmemh` 读进 64 KB 临时数组，再按 byte 索引分发到 `ram_c.v` 的四个 `dram` bank（`uu1.b1.d_ram_{1..4}.u_ram._ram`）。纯仿真路径，不改板上 RTL，两个 store 测试因此直接转绿，列表基线从 `44 PASS / 2 xfail` 升到 `46 PASS / 0 xfail`。
 
 ### 除法器说明
 

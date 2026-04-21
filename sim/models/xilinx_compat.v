@@ -61,7 +61,19 @@ always @(posedge clka) begin
     end
 end
 
-assign douta = ena ? mem[addra] : 8'h00;
+// Port A mirrors the Vivado BRAM "Read-First with output register" mode
+// that the real board uses: two pipeline stages on douta.  rtl/memory/rodata.v
+// relies on this latency, so leaving douta combinational (as an older version
+// of this stub did) breaks ROM-data loads in simulation while silently working
+// on hardware.
+reg [7:0] douta_r0;
+reg [7:0] douta_r1;
+always @(posedge clka) begin
+    douta_r0 <= ena ? mem[addra] : 8'h00;
+    douta_r1 <= douta_r0;
+end
+assign douta = douta_r1;
+
 assign doutb = enb ? {mem[word_byte_addr + 16'd3],
                       mem[word_byte_addr + 16'd2],
                       mem[word_byte_addr + 16'd1],

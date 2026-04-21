@@ -1,0 +1,21 @@
+# Simulation artefacts
+sim/output/
+*.vvp
+*.out
+*.vcd
+*.fst
+*.lxt2
+
+# Build/tmp
+build/
+*.log
+
+# Verilator lint outputs
+obj_dir/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

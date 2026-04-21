@@ -253,7 +253,14 @@ case(inst[6:2])
 			rs2=0;
 			rd=inst[11:7];
 			alu_op=0;
-			im=(( addr - 4 )+{inst[31:12],{12{1'b0}}});
+			// auipc: rd = PC + (imm20 << 12).  Earlier versions used
+			// `(addr - 4)` here; that was -4 low and was cancelling an
+			// equal -4 offset in ju.v's link computation and in pc.v's
+			// JALR target.  All three have been fixed together so that
+			// absolute addresses computed via `la` are now spec-correct
+			// (needed for sb/sh/sw store tests, which hang the bus when
+			// `la` resolves to 0x1FFFFFFC instead of 0x20000000).
+			im= addr + {inst[31:12],{12{1'b0}}};
 			im_c=1;
 			pc_im=0;
 			pc_c=0;

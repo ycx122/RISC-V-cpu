@@ -24,9 +24,9 @@ end
 always@(posedge clk)
 begin
 if (write_ce==1)
-    regs[write_addr]=write_data;
+    regs[write_addr]<=write_data;
 if(w_en_2==1)
-    regs[w_addr_2]=w_data_2;
+    regs[w_addr_2]<=w_data_2;
 end
 
 

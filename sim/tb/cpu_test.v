@@ -50,7 +50,38 @@ end
 
 always #10 clk=~clk;
 
-
+// Optional simulation-only RAM preload channel.
+//
+// Real hardware ships an ELF image where `.data` lives in the RAM window at
+// 0x20000000 (VMA) but is physically stored in ROM at a high LMA; a tiny
+// boot copy loop (crt0) moves it into RAM before main() runs.  This SoC
+// does not have such a loader, so RAM comes up all zeros in simulation.
+//
+// riscv-tests expect the `.data` section's initializer pattern to already
+// be in memory (e.g. rv32ui-p-sb / rv32ui-p-sh read back partially
+// overwritten `0xef` / `0xbeef` words).  When sim/run_isa.sh is invoked
+// with `+DRAM=<file>.data.hex`, this block pre-populates all four byte
+// banks of `ram_c` so those tests pass without needing an on-chip
+// bootloader.  The hex file is a flat byte-per-line dump of the `.data`
+// segment starting at the VMA base (`_ram[0]` across the four banks
+// corresponds to byte address 0x20000000).
+reg [7:0] dram_init_bytes [0:65535];
+reg [1023:0] dram_init_file;
+integer dram_i;
+initial begin
+    for (dram_i = 0; dram_i < 65536; dram_i = dram_i + 1)
+        dram_init_bytes[dram_i] = 8'h00;
+    if ($value$plusargs("DRAM=%s", dram_init_file)) begin
+        $display("[sim] preloading dram from %0s", dram_init_file);
+        $readmemh(dram_init_file, dram_init_bytes);
+        for (dram_i = 0; dram_i < 16384; dram_i = dram_i + 1) begin
+            uu1.b1.d_ram_1.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 0];
+            uu1.b1.d_ram_2.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 1];
+            uu1.b1.d_ram_3.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 2];
+            uu1.b1.d_ram_4.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 3];
+        end
+    end
+end
 
 initial 
 begin

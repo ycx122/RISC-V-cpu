@@ -1,8 +1,8 @@
 /////////////////////////////////////////
-//21/7/15           //
-//21/10/19          //all i
-//23/11/20          //v2
-//���㸴λ����̬Ϊ��
+// 21/07/15
+// 21/10/19          all instructions
+// 23/11/20          v2
+// Reset-active-high assumed throughout this file.
 /////////////////////////////////////////
 
 module cpu_jh
@@ -158,11 +158,11 @@ wire  id_pc_im_f;
  
  always@(posedge clk)
     if(cpu_rst==0)
-        e_inter_reg=0;
+        e_inter_reg<=0;
     else if(e_inter_reg==1 & pc_en==1 &(reg_4_pcaddr!=0))
-        e_inter_reg=0;
+        e_inter_reg<=0;
     else if(e_inter==1)
-        e_inter_reg=1;
+        e_inter_reg<=1;
 
 assign pc_set_en_pc= csr_pc_en | pc_set_en;
 assign pc_set_data_pc= (csr_pc_en==1)? csr_pc_data : ((pc_set_en==1) ? pc_set_data : 0);
@@ -206,7 +206,7 @@ wire d_wait,i_wait;
  assign i_wait= i_bus_en&(!i_bus_ready);
 
 always@(posedge clk)
-    flu_c_t=rst[0];
+    flu_c_t<=rst[0];
     
 always@(*)
     flu_c_6=rst[0] & flu_c_t;    
@@ -284,20 +284,6 @@ stop_cache b1(.clk(clk) ,
     else 
         id_rd_pc=id_rd;
 
- //reg reg2_en_delay=1;
- 
-// otof d2(
-// .clk(clk),
-// .rs1(id_rs1),
-// .rs2(id_rs2),
-// .rd(id_rd_pc),
-// .rd_wb(reg_4_rd),
-// .wb_en_2(id_wb_en),
-// .wb_en_5(reg_4_wb_en),
-// .rst(cpu_rst),
-// .local_stop(local_stop),
-// .en(reg2_en)
-// );
  otof1 d2(
  .clk(clk),
  .rs1(id_rs1),
@@ -383,14 +369,12 @@ always@(*)
 //alu
 
 alu a3 (
-alu_outdata,
- ,
- ,
- reg_2_op, 
- reg_2_op1 , 
- reg_2_op2 ,
- reg_2_id_sub
- );
+    .alu_out (alu_outdata),
+    .opcode  (reg_2_op),
+    .op1     (reg_2_op1),
+    .op2     (reg_2_op2),
+    .sub     (reg_2_id_sub)
+);
 
 mul_div mul_div3(
 .op1(reg_2_op1),
@@ -830,7 +814,7 @@ always@(posedge clk)
 		
 endmodule
 
-module stop_control(                            //��ͣ����
+module stop_control(                            // pipeline stall controller
  input d_bus_en,d_bus_ready,i_bus_en,i_bus_ready,cpu_rst,local_stop,div_wait,
  output wire reg1_en,reg2_en,reg3_en,reg4_en,
  output wire pc_en
@@ -858,7 +842,7 @@ module stop_control(                            //��ͣ����
  
  endmodule
  
- module data_f_control (            //��ˢģ��
+ module data_f_control (            // pipeline flush controller
  input [1:0]c_pc,
  input csr_data_c,
  
@@ -886,18 +870,18 @@ module stop_control(                            //��ͣ����
  reg local_stop_pos;
  always@(posedge clk)
     if(rst==0)
-        local_stop_d1=0;
+        local_stop_d1<=0;
     else
-        local_stop_d1=local_stop;
+        local_stop_d1<=local_stop;
         
  always@(*)
     local_stop_pos=local_stop & (~local_stop_d1);
  
  always@(posedge clk)
     if(rst==0)
-        i_cache=0;
+        i_cache<=0;
     else if(local_stop_pos==1)
-        i_cache=i_data_in;
+        i_cache<=i_data_in;
  
  always@(*)
  if(local_stop_d1==0)

@@ -7,9 +7,9 @@ module cpu_soc (
   input [7:0]key,
   output reg [15:0]led,
   
-  input 	uart_rxd,	//??????
-  output 	uart_txd,	//??????
-  input down_load_key   //0 is active
+  input 	uart_rxd,                       // UART RX
+  output 	uart_txd,                       // UART TX
+  input down_load_key                           // 0 = download mode, 1 = execute mode
 
 );
 /////////////////////////////////
@@ -249,10 +249,10 @@ cpu_jh a1 (
   
   always@(posedge cpu_clk)
     if(rst_n==0)
-        led=0;
+        led<=0;
     else if(led_en && bus_ram_we)
         // LED is exposed as a simple writeable MMIO register.
-        led=bus_data_out;
+        led<=bus_data_out;
   
   always@(*)
     if(led_en && bus_ram_re)
@@ -358,9 +358,9 @@ assign bus_ram_re   =ram_re    ;
 
 always@(posedge clk)
 if(rst_n==0)
-data_in=0;
+data_in<=0;
 else if(bus_bus_ready==1)
-data_in=bus_data_in;
+data_in<=bus_data_in;
 
 always@(posedge clk)
     if(rst_n==0)begin
@@ -423,9 +423,9 @@ always@(posedge clk)
 
     always@(posedge clk)
     if(rst_n==0)
-        state=IDLE;
+        state<=IDLE;
     else
-        state=n_state;
+        state<=n_state;
       
 
 

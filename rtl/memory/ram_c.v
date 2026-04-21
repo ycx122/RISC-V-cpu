@@ -261,12 +261,12 @@ module ram_c(
     // In download mode, each received UART byte is written into instruction ROM.
     wire rom_w_en =rx_done_pos & down_load_key;
     wire [7:0]uart_rx_data;
-    edge_detect2 edge_detect2(  
-     .clk(cpu_clk),           
-     .signal(rx_done),        
-     .pe(rx_done_pos),		//?????? 
-     .ne(),		//????? 
-     .de()		//?????  
+    edge_detect2 edge_detect2(
+     .clk(cpu_clk),
+     .signal(rx_done),
+     .pe(rx_done_pos),                              // rising  edge pulse
+     .ne(),                                         // falling edge pulse (unused)
+     .de()                                          // either  edge pulse (unused)
      );
 
     //always@(*)
@@ -295,28 +295,33 @@ module ram_c(
     //portA width 8
     //portB width 32
     
+    // UART receiver: captures bytes being streamed in while the board
+    // is in download mode. Each received byte becomes the next word of
+    // i_rom (see the rom_w_addr counter below).
     uart_rx uart_rx(
-	.sys_clk(cpu_clk),			//50M?????
-	.sys_rst_n(rst_n),			//????��
-	.uart_rxd(uart_rxd),			//??????????
-	.uart_rx_done(rx_done),		//????????????
-	.uart_rx_data(uart_rx_data)		//???????????
+	.sys_clk(cpu_clk),                              // 50 MHz system clock
+	.sys_rst_n(rst_n),                              // active-low reset
+	.uart_rxd(uart_rxd),                            // UART RX line
+	.uart_rx_done(rx_done),                         // 1-cycle done strobe
+	.uart_rx_data(uart_rx_data)                     // received byte
 );
-    
+
+    // UART transmitter: echoes an 'S' (0x53) back for every received byte
+    // while rom_w_addr == 0, i.e. only the very first byte of a download,
+    // as a minimal loopback / download-started indicator.
     uart_tx uart_tx(
-	.sys_clk(cpu_clk),	//50M?????
-	.sys_rst_n(rst_n),	//????��
-	.uart_data(8'd83),	//?????8��??????
-	.uart_tx_en(rx_done_pos==1 && rom_w_addr==0),	//??????????
-	.uart_txd(uart_txd)	//?????????????
- 
+	.sys_clk(cpu_clk),                              // 50 MHz system clock
+	.sys_rst_n(rst_n),                              // active-low reset
+	.uart_data(8'd83),                              // 'S' byte to send
+	.uart_tx_en(rx_done_pos==1 && rom_w_addr==0),   // TX enable pulse
+	.uart_txd(uart_txd)                             // UART TX line
 );
     
     always @(posedge cpu_clk)
         if(rst_n==0)
-            rom_w_addr=0;
+            rom_w_addr<=0;
         else if(rx_done_pos && down_load_key)
-            rom_w_addr=rom_w_addr+1;
+            rom_w_addr<=rom_w_addr+1;
         //else if(down_load_key==0)
          //   rom_w_addr=0;
     
@@ -339,12 +344,14 @@ module ram_c(
     
     endmodule
     
+// One-cycle edge detector on `signal`:
+//   pe = rising edge, ne = falling edge, de = either edge.
 module edge_detect2(
 input		clk,
 input		signal,
-output	reg	pe,		//??????
-output	reg	ne,		//?????
-output	reg	de		//?????
+output	reg	pe,
+output	reg	ne,
+output	reg	de
 );
 
 reg reg1;
@@ -407,7 +414,7 @@ endmodule
 
     
     always@(posedge clk)
-        state=n_state;
+        state<=n_state;
   
     
     

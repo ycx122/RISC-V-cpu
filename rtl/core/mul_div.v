@@ -68,11 +68,11 @@ wire div_ready;
 wire div_valid;
 
 div_state_machine dsm_0(
-    .clk(clk),            // ʱ���ź�
-    .rst_n(rst_n),          // ��λ�ź�
-    .start(div|divu|rem|remu),          // ��ʼ�ź�
-    .ready(div_ready),          // ��������źţ�ready��
-    .start_signal(div_valid)    // ��ʼ�źű�־
+    .clk(clk),                          // clock
+    .rst_n(rst_n),                      // active-low reset
+    .start(div|divu|rem|remu),          // request a new division
+    .ready(div_ready),                  // divider done
+    .start_signal(div_valid)            // 1-cycle valid strobe into div_0
 );
     
     mul mul_test(
@@ -133,44 +133,43 @@ assign ready=mul|mulh|mulhsu|mulhu|(div&div_ready)|(divu&div_ready)|(rem&div_rea
 endmodule
 
 module div_state_machine(
-    input wire clk,            // ʱ���ź�
-    input wire rst_n,          // ��λ�ź�
-    input wire start,          // ��ʼ�ź�
-    input wire ready,          // ��������źţ�ready��
-    output reg start_signal    // ��ʼ�źű�־
+    input wire clk,            // clock
+    input wire rst_n,          // active-low reset
+    input wire start,          // request a new division
+    input wire ready,          // divider done
+    output reg start_signal    // 1-cycle valid strobe to the divider
 );
 
-// ״̬����
-localparam IDLE              = 1'b0,
+// States
+localparam IDLE                = 1'b0,
            WAIT_FOR_COMPLETION = 1'b1;
 
-// ״̬�Ĵ���
 reg state;
 
-// ״̬ת���߼�
-always @(posedge clk ) begin
-    if (rst_n==0) begin
-        // �첽��λ��IDLE״̬
-        state <= IDLE;
+// State-transition logic.
+//
+// IDLE: pulse start_signal high for one cycle when a new division
+// request arrives, then move to WAIT_FOR_COMPLETION. Stay there until
+// the divider raises `ready`, which returns us to IDLE.
+always @(posedge clk) begin
+    if (rst_n == 0) begin
+        state        <= IDLE;
         start_signal <= 1'b0;
     end else begin
         case (state)
             IDLE: begin
-                // �ڿ���״̬�յ�start�źţ�����ȴ��������״̬
                 if (start) begin
-                    state <= WAIT_FOR_COMPLETION;
-                    start_signal <= 1'b1;  // ���Ϳ�ʼ�źű�־
+                    state        <= WAIT_FOR_COMPLETION;
+                    start_signal <= 1'b1;
                 end
             end
             WAIT_FOR_COMPLETION: begin
-                start_signal <= 1'b0;  // �����ʼ�źű�־
-                // �ڵȴ�״̬�յ�ready�źţ�����IDLE״̬
+                start_signal <= 1'b0;
                 if (ready) begin
                     state <= IDLE;
                 end
             end
             default: begin
-                // �쳣������ص���ʼ״̬
                 state <= IDLE;
             end
         endcase

@@ -55,35 +55,35 @@ module clnt(
     
     always@(posedge clk)
         if(rst_n==0)
-            mtime=0;
+            mtime<=0;
         else if(clnt_addr==0 && clnt_en==1 && we==1)
-            mtime={mtime[63:32],din};
+            mtime<={mtime[63:32],din};
         else if(clnt_addr==1 && clnt_en==1 && we==1)
-            mtime={din,mtime[31:0]};        
+            mtime<={din,mtime[31:0]};        
         else
-            mtime=mtime+1;
+            mtime<=mtime+1;
     
    always@(posedge clk)
         if(rst_n==0)
-            mtime_cmp=64'h0000_0000_02FA_F080;
+            mtime_cmp<=64'h0000_0000_02FA_F080;
         else if(clnt_addr==2 && clnt_en==1 && we==1)
-            mtime_cmp={mtime_cmp[63:32],din};
+            mtime_cmp<={mtime_cmp[63:32],din};
         else if(clnt_addr==3 && clnt_en==1 && we==1)
-            mtime_cmp={din,mtime_cmp[31:0]};     
+            mtime_cmp<={din,mtime_cmp[31:0]};     
     
     always@(posedge clk)
         if(rst_n==0)
-            clnt_flag=0;
+            clnt_flag<=0;
         else if(clnt_addr==4 && clnt_en==1 && we==1)
-            clnt_flag=din;  
+            clnt_flag<=din;  
 
     always@(posedge clk)
         if(rst_n==0)
-            time_e_inter=0;
+            time_e_inter<=0;
         else if(mtime_cmp==mtime)
-            time_e_inter=clnt_flag;
+            time_e_inter<=clnt_flag;
         else
-            time_e_inter=0;
+            time_e_inter<=0;
     
     
     

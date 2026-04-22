@@ -84,46 +84,6 @@ wire _unused_irom = clkb ^ web ^ dinb[0];
 
 endmodule
 
-module div_0 (
-    input  wire        aclk,
-    input  wire [31:0] s_axis_divisor_tdata,
-    input  wire        s_axis_divisor_tvalid,
-    input  wire [31:0] s_axis_dividend_tdata,
-    input  wire        s_axis_dividend_tvalid,
-    output reg  [63:0] m_axis_dout_tdata,
-    output reg         m_axis_dout_tvalid
-);
-
-reg busy;
-reg [63:0] result_next;
-wire start_div = s_axis_divisor_tvalid && s_axis_dividend_tvalid && !busy;
-
-always @(posedge aclk) begin
-    if (start_div) begin
-        busy <= 1'b1;
-        m_axis_dout_tvalid <= 1'b0;
-
-        if (s_axis_divisor_tdata == 32'b0) begin
-            result_next[63:32] <= 32'hffff_ffff;
-            result_next[31:0]  <= s_axis_dividend_tdata;
-        end else begin
-            result_next[63:32] <= s_axis_dividend_tdata / s_axis_divisor_tdata;
-            result_next[31:0]  <= s_axis_dividend_tdata % s_axis_divisor_tdata;
-        end
-    end else if (busy) begin
-        busy <= 1'b0;
-        m_axis_dout_tdata <= result_next;
-        m_axis_dout_tvalid <= 1'b1;
-    end else begin
-        m_axis_dout_tvalid <= 1'b0;
-    end
-end
-
-initial begin
-    busy = 1'b0;
-    result_next = 64'b0;
-    m_axis_dout_tdata = 64'b0;
-    m_axis_dout_tvalid = 1'b0;
-end
-
-endmodule
+// div_0 (Xilinx IP) stub was retired in Tier 2 of the improvement plan.
+// The divider is now provided by the self-contained iterative module in
+// rtl/core/div_gen.v, which is used by both simulation and synthesis.

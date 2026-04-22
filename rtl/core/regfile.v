@@ -1,118 +1,70 @@
+// 32x32 RISC-V integer register file.
+//
+// Rewritten to use an array-indexed read/write pattern instead of the
+// original 32-case combinational MUX.  Behavioural consequences:
+//
+//   * x0 is hard-wired to zero on both read ports, regardless of any
+//     write that targets write_addr==0 or w_addr_2==0.  The original
+//     file also achieved this (read index 0 returned `reg_0`, which
+//     was never written) but only as a side-effect of the case
+//     statement layout; the new form states it explicitly.
+//
+//   * Two simultaneous writes that target the same rd (port 1 = WB
+//     path via csr_reg, port 2 = early write-back from EX via the
+//     reg_3 fast-path) collide when a pair of back-to-back instructions
+//     writes the same rd: cycle K has the older producer's WB AND the
+//     younger producer's fast-path both targeting that rd.  The fast
+//     path carries the newer value, so it must win.  We enforce that
+//     explicitly by ordering the two non-blocking assignments (write_ce
+//     first, w_en_2 second) instead of relying on a one-case MUX so the
+//     priority is obvious when reading the source.
+//
+//   * Read-during-write semantics are "read old value" (classic write
+//     port → regs array → combinational read), unchanged from before.
+//     That matches the forwarding assumptions baked into otof1.v:
+//     the WB stage's value is forwarded explicitly through the MUX in
+//     cpu_jh.v rather than via a read-new-write bypass here.
+// Port order kept bit-compatible with the old 32-case implementation
+// so cpu_jh.v's positional instantiation continues to work unchanged.
 module regfile (
-output reg [31:0]data1,
-output reg [31:0]data2,
-input clk,
-input [31:0]write_data,
-input [4:0]write_addr,
-input [4:0]read_1_addr,
-input [4:0]read_2_addr,
-input write_ce,
-input w_en_2,
-input [4:0]w_addr_2,
-input [31:0]w_data_2
+    output [31:0] data1,
+    output [31:0] data2,
+    input         clk,
+
+    // Architectural write-back (csr_reg → regfile_data1 destination).
+    input  [31:0] write_data,
+    input  [4:0]  write_addr,
+
+    // Read ports.
+    input  [4:0]  read_1_addr,
+    input  [4:0]  read_2_addr,
+
+    input         write_ce,
+
+    // Early write-back from EX (reg_3 fast-path: `w_en_2 & reg_3_wq`).
+    input         w_en_2,
+    input  [4:0]  w_addr_2,
+    input  [31:0] w_data_2
 );
-reg reg_0=0;
-reg [31:0] regs [31:0];
-reg [10:0]i;
 
-initial
-begin
-for(i=1;i<32;i=i+1)
-	regs[i]=0;
+reg [31:0] regs [1:31];
+integer init_i;
+
+initial begin
+    for (init_i = 1; init_i < 32; init_i = init_i + 1)
+        regs[init_i] = 32'h0;
 end
 
-always@(posedge clk)
-begin
-if (write_ce==1)
-    regs[write_addr]<=write_data;
-if(w_en_2==1)
-    regs[w_addr_2]<=w_data_2;
+always @(posedge clk) begin
+    // WB first; fast-path second so it wins a same-rd collision.
+    if (write_ce && (write_addr != 5'd0))
+        regs[write_addr] <= write_data;
+    if (w_en_2 && (w_addr_2 != 5'd0))
+        regs[w_addr_2] <= w_data_2;
 end
 
-
-		
-always@(*)
-case(read_1_addr)
-		0:data1<=reg_0;
-		1:data1<=regs[1];
-		2:data1<=regs[2];
-		3:data1<=regs[3];
-		4:data1<=regs[4];
-		5:data1<=regs[5];
-		6:data1<=regs[6];
-		7:data1<=regs[7];
-		8:data1<=regs[8];
-		9:data1<=regs[9];
-		10:data1<=regs[10];
-		11:data1<=regs[11];
-		12:data1<=regs[12];
-		13:data1<=regs[13];
-		14:data1<=regs[14];
-		15:data1<=regs[15];
-		16:data1<=regs[16];
-		17:data1<=regs[17];
-		18:data1<=regs[18];
-		19:data1<=regs[19];
-		20:data1<=regs[20];
-		21:data1<=regs[21];
-		22:data1<=regs[22];
-		23:data1<=regs[23];
-		24:data1<=regs[24];
-		25:data1<=regs[25];
-		26:data1<=regs[26];
-		27:data1<=regs[27];
-		28:data1<=regs[28];
-		29:data1<=regs[29];
-		30:data1<=regs[30];
-		31:data1<=regs[31];
-		default: data1<={32{1'bx}};
-endcase
-
-always@(*)
-case(read_2_addr)
-		0:data2<=reg_0;
-		1:data2<=regs[1];
-		2:data2<=regs[2];
-		3:data2<=regs[3];
-		4:data2<=regs[4];
-		5:data2<=regs[5];
-		6:data2<=regs[6];
-		7:data2<=regs[7];
-		8:data2<=regs[8];
-		9:data2<=regs[9];
-		10:data2<=regs[10];
-		11:data2<=regs[11];
-		12:data2<=regs[12];
-		13:data2<=regs[13];
-		14:data2<=regs[14];
-		15:data2<=regs[15];
-		16:data2<=regs[16];
-		17:data2<=regs[17];
-		18:data2<=regs[18];
-		19:data2<=regs[19];
-		20:data2<=regs[20];
-		21:data2<=regs[21];
-		22:data2<=regs[22];
-		23:data2<=regs[23];
-		24:data2<=regs[24];
-		25:data2<=regs[25];
-		26:data2<=regs[26];
-		27:data2<=regs[27];
-		28:data2<=regs[28];
-		29:data2<=regs[29];
-		30:data2<=regs[30];
-		31:data2<=regs[31];
-		default: data2<={32{1'bx}};
-endcase	
-
+// x0 stays zero; x1..x31 come from the array.
+assign data1 = (read_1_addr == 5'd0) ? 32'h0 : regs[read_1_addr];
+assign data2 = (read_2_addr == 5'd0) ? 32'h0 : regs[read_2_addr];
 
 endmodule
-		
-		
-		
-		
-		
-		
-		
-		
-		

@@ -334,14 +334,19 @@ module ram_c(
     //portA width 8
     //portB width 8
     
-    wire ram_ready_r;
-    wire ram_ready_w=we&d_en;
-    
-    // Writes complete immediately; reads return after a fixed delay.
-    assign ram_ready=ram_ready_r|ram_ready_w;
-    
-    delay delay1(cpu_clk,re&d_en,1'b0,ram_ready_r);
-    
+    // The `dram` primitive in rtl/common/primitives/ram.v has combinational
+    // reads (the data_o `always @(*)` block), which on Xilinx parts will be
+    // inferred as distributed RAM rather than BRAM.  That means d_out_ram*
+    // is valid the same cycle d_addr is driven, so the load data is already
+    // ready combinationally when the MEM stage issues the access.  The old
+    // `delay` FSM added one bubble cycle per load for no reason, costing
+    // ~20-40% IPC on load-heavy code; it is removed here.  Writes were
+    // already single-cycle (ram_ready_w = we & d_en), so the behaviour
+    // simply collapses to: any d_en'd read or write completes this cycle.
+    wire ram_ready_r = re & d_en;
+    wire ram_ready_w = we & d_en;
+    assign ram_ready = ram_ready_r | ram_ready_w;
+
     endmodule
     
 // One-cycle edge detector on `signal`:
@@ -369,57 +374,8 @@ endmodule
     
     
     
-    module delay (
-    input clk,
-    input re,
-    input we,
-    output reg ready
-    );
-    localparam IDLE =2'b00;
-    localparam D1   =2'b01;
-    localparam D2   =2'b10;
-    
-    wire e;
-    
-    assign e= we | re;
-    
-    reg [1:0]state =0;
-    reg [1:0] n_state;
-    
-    always@(*)
-        case(state)
-            IDLE:begin
-                if(e==1)
-                    n_state=D2;//D1
-                else
-                    n_state=IDLE;
-                end
-            D1:begin
-                n_state=D2;
-                end
-            D2:begin
-                    n_state=IDLE;
-                end
-            default:n_state=IDLE;
-            endcase
-      
-
-    
-    always@(*)
-    if(state==D2)
-        ready=1;
-    else
-        ready=0;
-        
-
-    
-    always@(posedge clk)
-        state<=n_state;
-  
-    
-    
-    
-    endmodule
+    // Former module `delay` deleted together with the per-load bubble it
+    // used to inject; see the ram_ready assignment above for details.
     
     
    // reg state;

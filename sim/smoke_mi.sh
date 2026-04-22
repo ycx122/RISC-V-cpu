@@ -1,38 +1,26 @@
 #!/usr/bin/env bash
+# Machine-mode trap smoke test.
+#
+# Builds sim/tests/mi_smoke.S, feeds it to the same cpu_test testbench, and
+# waits for the standard x26/x27 PASS protocol. This is our equivalent of
+# the upstream rv32mi-p-* regression: the repo ships only rv32ui / rv32um
+# source, so we hand-write a small M-mode exception round-trip instead.
+#
+# Usage:
+#   bash sim/smoke_mi.sh [--keep]
+#
+# Environment:
+#   MI_SMOKE_TIMEOUT  timeout passed to `timeout` (default: 10s)
+
 set -euo pipefail
-
-usage() {
-    cat <<'EOF'
-Usage: sim/smoke.sh [--keep] [--help]
-
-Builds a minimal RV32IM smoke-test program, compiles the Icarus Verilog
-testbench, and runs the simulation until it reports TEST_PASS or fails.
-
-Options:
-  --keep    Keep the temporary build directory instead of deleting it
-  --help    Show this help message
-
-Environment:
-  SMOKE_TIMEOUT   Simulation timeout passed to `timeout` (default: 10s)
-EOF
-}
 
 keep_build_dir=0
 while (($# > 0)); do
     case "$1" in
-        --keep)
-            keep_build_dir=1
-            shift
-            ;;
+        --keep)  keep_build_dir=1; shift ;;
         --help|-h)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1" >&2
-            usage >&2
-            exit 1
-            ;;
+            sed -n '2,14p' "$0"; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 
@@ -41,7 +29,8 @@ repo_root=$(cd "$script_dir/.." && pwd)
 
 toolbin="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin"
 linker_script="$repo_root/sw/tinyriscv/tests/example/d.lds"
-smoke_timeout="${SMOKE_TIMEOUT:-10s}"
+src_file="$repo_root/sim/tests/mi_smoke.S"
+timeout_val="${MI_SMOKE_TIMEOUT:-10s}"
 
 gcc_bin="$toolbin/riscv64-unknown-elf-gcc"
 objcopy_bin="$toolbin/riscv64-unknown-elf-objcopy"
@@ -54,54 +43,24 @@ for required in "$gcc_bin" "$objcopy_bin" "$objdump_bin" iverilog vvp timeout; d
     fi
 done
 
-build_dir=$(mktemp -d "${TMPDIR:-/tmp}/riscv-cpu-smoketest.XXXXXX")
+build_dir=$(mktemp -d "${TMPDIR:-/tmp}/riscv-cpu-mi-smoke.XXXXXX")
 cleanup() {
-    if [[ "$keep_build_dir" -eq 0 ]]; then
-        rm -rf "$build_dir"
-    else
-        echo "Kept build directory: $build_dir"
-    fi
+    if [[ "$keep_build_dir" -eq 0 ]]; then rm -rf "$build_dir"
+    else echo "Kept build directory: $build_dir"; fi
 }
 trap cleanup EXIT
 
-cat >"$build_dir/minimal_div_pass.S" <<'EOF'
-    .section .text
-    .globl _start
-_start:
-    addi x1, x0, 121
-    addi x2, x0, 11
-    div  x3, x1, x2
-    addi x4, x0, 11
-    bne  x3, x4, fail
-pass:
-    addi x26, x0, 1
-    addi x27, x0, 1
-1:
-    jal  x0, 1b
-fail:
-    addi x26, x0, 1
-    addi x27, x0, 0
-2:
-    jal  x0, 2b
-EOF
-
-echo "[1/4] Building minimal RV32IM smoke program..."
+echo "[1/4] Building M-mode trap smoke program..."
 "$gcc_bin" \
-    -march=rv32im \
-    -mabi=ilp32 \
+    -march=rv32im -mabi=ilp32 \
+    -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles \
     -T "$linker_script" \
-    -nostdlib \
-    -nostartfiles \
-    "$build_dir/minimal_div_pass.S" \
-    -o "$build_dir/minimal_div_pass.elf"
+    "$src_file" \
+    -o "$build_dir/mi_smoke.elf"
 
 echo "[2/4] Generating ROM image..."
-"$objcopy_bin" -O verilog \
-    "$build_dir/minimal_div_pass.elf" \
-    "$build_dir/minimal_div_pass.verilog"
-"$objdump_bin" --disassemble-all \
-    "$build_dir/minimal_div_pass.elf" \
-    >"$build_dir/minimal_div_pass.dump"
+"$objcopy_bin" -O verilog "$build_dir/mi_smoke.elf" "$build_dir/mi_smoke.verilog"
+"$objdump_bin" --disassemble-all "$build_dir/mi_smoke.elf" >"$build_dir/mi_smoke.dump"
 
 echo "[3/4] Compiling Icarus Verilog testbench..."
 rtl_files=(
@@ -138,12 +97,17 @@ rtl_files=(
     "$repo_root/rtl/common/primitives/fifo.v"
 )
 
-iverilog -o "$build_dir/cpu_test_smoke.out" -s cpu_test "${rtl_files[@]}"
+iverilog -o "$build_dir/cpu_test_mi.out" -s cpu_test ${MI_IVERILOG_DEFS:-} "${rtl_files[@]}"
 
 echo "[4/4] Running simulation..."
-if ! sim_output=$(timeout "$smoke_timeout" vvp -n "$build_dir/cpu_test_smoke.out" +IROM="$build_dir/minimal_div_pass.verilog" 2>&1); then
+if ! sim_output=$(timeout "$timeout_val" vvp -n "$build_dir/cpu_test_mi.out" +IROM="$build_dir/mi_smoke.verilog" +EINT_AT=3000000 ${MI_VVP_ARGS:-} 2>&1); then
+    rc=$?
     printf '%s\n' "$sim_output"
-    echo "Smoke test failed or timed out after $smoke_timeout." >&2
+    if [[ "$rc" -eq 124 ]]; then
+        echo "M-mode smoke TIMED OUT after $timeout_val." >&2
+    else
+        echo "M-mode smoke failed (rc=$rc)." >&2
+    fi
     exit 1
 fi
 
@@ -151,7 +115,7 @@ printf '%s\n' "$sim_output"
 
 case "$sim_output" in
     *"TEST_PASS"*)
-        echo "Smoke test passed."
+        echo "M-mode trap smoke passed."
         ;;
     *)
         echo "Simulation completed without TEST_PASS marker." >&2

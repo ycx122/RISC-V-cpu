@@ -1,179 +1,135 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2024/04/06 18:38:49
-// Design Name: You CX
-// Module Name: mul_div
-// Project Name: mul and div
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
+// Module: mul_div
+// Project: RISC-V CPU
+// Description:
+//   RV32M multiply / divide / remainder unit.
+//
+//   opcode encoding (matches id.v):
+//     0  MUL      (low 32 bits of signed*signed)
+//     1  MULH     (high 32 bits of signed*signed)
+//     2  MULHSU   (high 32 bits of signed*unsigned)
+//     3  MULHU    (high 32 bits of unsigned*unsigned)
+//     4  DIV      (signed)
+//     5  DIVU     (unsigned)
+//     6  REM      (signed remainder)
+//     7  REMU     (unsigned remainder)
+//
+//   Corner-case semantics (RV32M spec):
+//     DIV/REM by zero  -> quotient = -1 (0xFFFF_FFFF), remainder = dividend
+//     DIVU/REMU by 0   -> quotient = 0xFFFF_FFFF, remainder = dividend
+//     DIV overflow     -> MIN_INT / -1 : quotient = MIN_INT, remainder = 0
+//
+//   The iterative divider (rtl/core/div_gen.v) is invoked in unsigned form
+//   with pre-negated operands; sign reconstruction happens in the output mux
+//   below. Divide-by-zero / overflow cases bypass the divider output entirely
+//   and return the spec values directly.
 //////////////////////////////////////////////////////////////////////////////////
 
 
 module mul_div(
-    input [31:0] op1,
-    input [31:0] op2,
-    input [2:0] opcode,
-    input en,
-    
-    input clk,
-    input rst_n,
-    
+    input  [31:0] op1,
+    input  [31:0] op2,
+    input  [2:0]  opcode,
+    input         en,
+
+    input         clk,
+    input         rst_n,
+
     output reg [31:0] mul_div_output,
-    output ready
-    );
-    
-wire op1_neg=op1[31];
-wire op2_neg=op2[31];
+    output            ready
+);
 
-wire [31:0] op1_postive=(op1_neg==1)?-op1:op1;
-wire [31:0] op2_postive=(op2_neg==1)?-op2:op2;
-    
-wire [63:0]mul_out;
+wire op1_neg = op1[31];
+wire op2_neg = op2[31];
 
-wire mul   =(en==1 & opcode==0)?1:0;
-wire mulh  =(en==1 & opcode==1)?1:0;
-wire mulhsu=(en==1 & opcode==2)?1:0;
-wire mulhu  =(en==1 & opcode==3)?1:0;
-wire div   =(en==1 & opcode==4)?1:0;
-wire divu  =(en==1 & opcode==5)?1:0;
-wire rem   =(en==1 & opcode==6)?1:0;
-wire remu  =(en==1 & opcode==7)?1:0;
+wire [31:0] op1_postive = op1_neg ? -op1 : op1;
+wire [31:0] op2_postive = op2_neg ? -op2 : op2;
 
-wire [31:0] mul_din1=(mulh|mulhsu)?op1_postive:op1;
-wire [31:0] mul_din2=(mulh)?op2_postive:op2;
+wire mul    = en & (opcode == 3'd0);
+wire mulh   = en & (opcode == 3'd1);
+wire mulhsu = en & (opcode == 3'd2);
+wire mulhu  = en & (opcode == 3'd3);
+wire div    = en & (opcode == 3'd4);
+wire divu   = en & (opcode == 3'd5);
+wire rem    = en & (opcode == 3'd6);
+wire remu   = en & (opcode == 3'd7);
 
-wire [31:0] div_din1=(div|rem)?op1_postive:op1;
-wire [31:0] div_din2=(div|rem)?op2_postive:op2;
+wire [31:0] mul_din1 = (mulh | mulhsu) ? op1_postive : op1;
+wire [31:0] mul_din2 = (mulh)          ? op2_postive : op2;
 
-wire [63:0]mul_output;
-wire [63:0]div_output;
+wire [31:0] div_din1 = (div | rem) ? op1_postive : op1;
+wire [31:0] div_din2 = (div | rem) ? op2_postive : op2;
 
-wire [31:0]div_result=div_output[63:32];
-wire [31:0]rem_result=div_output[31:0];
-wire div_zero = (op2 == 32'b0);
+wire [63:0] mul_output;
+wire [31:0] div_result;
+wire [31:0] rem_result;
+wire        div_ready;
+
+wire div_zero     = (op2 == 32'b0);
 wire div_overflow = (op1 == 32'h8000_0000) && (op2 == 32'hffff_ffff);
 
-wire div_ready;
-wire div_valid;
-
-div_state_machine dsm_0(
-    .clk(clk),                          // clock
-    .rst_n(rst_n),                      // active-low reset
-    .start(div|divu|rem|remu),          // request a new division
-    .ready(div_ready),                  // divider done
-    .start_signal(div_valid)            // 1-cycle valid strobe into div_0
-);
-    
-    mul mul_test(
-    .clk(clk),
-    .rst(1'b0),
-    .en(mul|mulh|mulhsu|mulhu),
-    
+mul mul_test(
+    .clk (clk),
+    .rst (1'b0),
+    .en  (mul | mulh | mulhsu | mulhu),
     .din1(mul_din1),
     .din2(mul_din2),
     .dout(mul_output)
-    );
-    
-    div_0 div_0(
-    .aclk(clk),
-    .s_axis_divisor_tdata(div_din2),
-    .s_axis_divisor_tvalid(div_valid),
-    .s_axis_dividend_tdata(div_din1),
-    .s_axis_dividend_tvalid(div_valid),
-    
-    .m_axis_dout_tdata(div_output),
-    .m_axis_dout_tvalid(div_ready)
-    
-    
-    );
-
-always@(*)
-    if(mul==1)
-        mul_div_output<=mul_output[31:0];
-    else if(mulh==1)    
-        mul_div_output<=((op1_neg^op2_neg)?-mul_output:mul_output)>>32;
-    else if(mulhsu==1)
-        mul_div_output<=((op1_neg)?-mul_output:mul_output)>>32;
-    else if(mulhu==1)
-        mul_div_output<=mul_output[63:32];
-    else if(div==1)
-        if(div_zero)
-            mul_div_output<=32'hffff_ffff;
-        else if(div_overflow)
-            mul_div_output<=32'h8000_0000;
-        else
-            mul_div_output<=(op1_neg^op2_neg)?-div_result:div_result;
-    else if(divu==1)
-        mul_div_output<=div_zero ? 32'hffff_ffff : div_result;
-    else if(rem==1)
-        if(div_zero)
-            mul_div_output<=op1;
-        else if(div_overflow)
-            mul_div_output<=32'h0000_0000;
-        else
-            mul_div_output<=(op1_neg)?-rem_result:rem_result;
-    else if(remu==1)
-        mul_div_output<=div_zero ? op1 : rem_result;
-    else
-        mul_div_output<=0;
-        
-assign ready=mul|mulh|mulhsu|mulhu|(div&div_ready)|(divu&div_ready)|(rem&div_ready)|(remu&div_ready);
-    
-endmodule
-
-module div_state_machine(
-    input wire clk,            // clock
-    input wire rst_n,          // active-low reset
-    input wire start,          // request a new division
-    input wire ready,          // divider done
-    output reg start_signal    // 1-cycle valid strobe to the divider
 );
 
-// States
-localparam IDLE                = 1'b0,
-           WAIT_FOR_COMPLETION = 1'b1;
+// Iterative restoring radix-4 divider (see rtl/core/div_gen.v).
+// `start` is held for the entire duration that the div/rem op sits in
+// stage 2 of the pipeline; div_gen only latches the operands on the
+// IDLE->RUN transition, so repeated assertions during the ~18-cycle run
+// are harmless.
+div_gen div_gen_u (
+    .clk      (clk),
+    .rst_n    (rst_n),
+    .start    (div | divu | rem | remu),
+    .dividend (div_din1),
+    .divisor  (div_din2),
+    .ready    (div_ready),
+    .quotient (div_result),
+    .remainder(rem_result)
+);
 
-reg state;
-
-// State-transition logic.
-//
-// IDLE: pulse start_signal high for one cycle when a new division
-// request arrives, then move to WAIT_FOR_COMPLETION. Stay there until
-// the divider raises `ready`, which returns us to IDLE.
-always @(posedge clk) begin
-    if (rst_n == 0) begin
-        state        <= IDLE;
-        start_signal <= 1'b0;
+always @(*) begin
+    if (mul) begin
+        mul_div_output = mul_output[31:0];
+    end else if (mulh) begin
+        mul_div_output = (((op1_neg ^ op2_neg) ? -mul_output : mul_output) >> 32);
+    end else if (mulhsu) begin
+        mul_div_output = ((op1_neg ? -mul_output : mul_output) >> 32);
+    end else if (mulhu) begin
+        mul_div_output = mul_output[63:32];
+    end else if (div) begin
+        if (div_zero)
+            mul_div_output = 32'hffff_ffff;
+        else if (div_overflow)
+            mul_div_output = 32'h8000_0000;
+        else
+            mul_div_output = (op1_neg ^ op2_neg) ? -div_result : div_result;
+    end else if (divu) begin
+        mul_div_output = div_zero ? 32'hffff_ffff : div_result;
+    end else if (rem) begin
+        if (div_zero)
+            mul_div_output = op1;
+        else if (div_overflow)
+            mul_div_output = 32'h0000_0000;
+        else
+            mul_div_output = op1_neg ? -rem_result : rem_result;
+    end else if (remu) begin
+        mul_div_output = div_zero ? op1 : rem_result;
     end else begin
-        case (state)
-            IDLE: begin
-                if (start) begin
-                    state        <= WAIT_FOR_COMPLETION;
-                    start_signal <= 1'b1;
-                end
-            end
-            WAIT_FOR_COMPLETION: begin
-                start_signal <= 1'b0;
-                if (ready) begin
-                    state <= IDLE;
-                end
-            end
-            default: begin
-                state <= IDLE;
-            end
-        endcase
+        mul_div_output = 32'b0;
     end
 end
+
+// Multiplication is combinational (1-cycle, mostly LUT adder tree), so any
+// mul op is "ready" in the same cycle it is presented. Div/rem wait for the
+// iterative divider's one-cycle `ready` pulse.
+assign ready = mul | mulh | mulhsu | mulhu |
+               ((div | divu | rem | remu) & div_ready);
 
 endmodule

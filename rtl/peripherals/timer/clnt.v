@@ -77,13 +77,21 @@ module clnt(
         else if(clnt_addr==4 && clnt_en==1 && we==1)
             clnt_flag<=din;  
 
+    // Level-sensitive timer interrupt output.  Previously this was a
+    // one-cycle pulse generated only when `mtime == mtime_cmp`; that
+    // paired with a bespoke pulse->latch chain in cpu_soc.v/cpu_jh.v and
+    // is incompatible with the standard CLINT model where mip.MTIP is a
+    // level that stays asserted as long as mtime >= mtime_cmp.  Software
+    // clears it by bumping mtime_cmp past mtime in the timer handler.
+    //
+    // `clnt_flag` is kept as a software enable: writing 0 to the flag
+    // register forces MTIP low regardless of the comparison, which is
+    // the "disable timer" knob bare-metal code expects.
     always@(posedge clk)
         if(rst_n==0)
             time_e_inter<=0;
-        else if(mtime_cmp==mtime)
-            time_e_inter<=clnt_flag;
         else
-            time_e_inter<=0;
+            time_e_inter<=(clnt_flag!=32'd0) & (mtime>=mtime_cmp);
     
     
     

@@ -37,7 +37,15 @@ rtl_files=(
     "$repo_root/sim/tb/cpu_test.v"
     "$repo_root/rtl/soc/cpu_soc.v"
     "$repo_root/rtl/core/cpu_jh.v"
+    "$repo_root/rtl/core/pipeline_regs.v"
+    "$repo_root/rtl/core/hazard_ctrl.v"
+    "$repo_root/rtl/core/flush_ctrl.v"
+    "$repo_root/rtl/core/stop_cache.v"
+    "$repo_root/rtl/core/branch_unit.v"
+    "$repo_root/rtl/core/forward_mux.v"
+    "$repo_root/rtl/core/mem_ctrl.v"
     "$repo_root/rtl/core/pc.v"
+    "$repo_root/rtl/core/branch_pred.v"
     "$repo_root/rtl/core/id.v"
     "$repo_root/rtl/core/alu.v"
     "$repo_root/rtl/core/csr_reg.v"
@@ -46,6 +54,7 @@ rtl_files=(
     "$repo_root/rtl/core/im2op.v"
     "$repo_root/rtl/core/otof1.v"
     "$repo_root/rtl/core/mul_div.v"
+    "$repo_root/rtl/core/div_gen.v"
     "$repo_root/sim/models/xilinx_compat.v"
     "$repo_root/rtl/core/mul.v"
     "$repo_root/rtl/interconnect/addr2c.v"
@@ -62,7 +71,15 @@ rtl_files=(
 # the required extension / feature. See README "ISA 测试限制与架构边界".
 # Update this list as features are added.
 declare -a SKIP_LIST=(
-    "rv32ui-p-fence_i"   # Zifencei not implemented
+    # fence.i itself is now decoded (see id.v opcode 0001111) and drains
+    # pending stores in cpu_jh.v (fence_stall gates stop_control).
+    # rv32ui-p-fence_i is still skipped because it exercises self-modifying
+    # code: it stores into the .text region in the 0x00000000 window, which
+    # on this SoC is fronted by rodata.v (a read-only ROM controller).
+    # Enabling this test would require giving rodata.v a store path into
+    # i_rom port A, which is an SoC/memory-subsystem change rather than
+    # a CPU-core one.
+    "rv32ui-p-fence_i"   # SoC ROM controller is read-only (no self-modifying code)
 )
 
 # Tests that are currently expected to FAIL because of known architectural

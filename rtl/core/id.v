@@ -18,12 +18,33 @@ output reg sub,
 output reg [2:0]mem_op,
 output reg [14:0]csr,
 output mul_div_ctrl,
-output reg wq
+output reg wq,
+
+// FENCE / FENCE.I decode hint.  Both opcode=0001111 encodings are treated as
+// a drain-the-pipeline NOP by cpu_jh.v so the subsequent fetch observes the
+// effects of every earlier store.  fence.i (funct3=001) and fence (funct3=000)
+// do not have architecturally distinct semantics on this single-core, no-I$
+// pipeline, so we collapse them into the same signal.
+output is_fence_i,
+
+// IllegalInstruction decode.  Asserted in WB at the same pipeline slot as
+// `csr` so csr_reg.v can raise an M-mode exception with mcause=2.
+//
+// An instruction is flagged illegal when:
+//   * its low two bits != 2'b11 AND inst != 0   (compressed/unknown while
+//     C is not implemented).  All-zero is kept as a non-trapping bubble
+//     so pipeline bubbles / reset state / flushed fetches don't fire a
+//     spurious trap.
+//   * or the RV32I opcode field (inst[6:2]) decodes into the `default`
+//     branch below (unknown opcode).
+output reg illegal
 );
 
 assign mul_div_ctrl=(inst[6:2]==5'b01100 & inst[25]==1)?1:0;
+assign is_fence_i  =(inst[1:0]==2'b11 & inst[6:2]==5'b00011) ? 1'b1 : 1'b0;
 
-always@(*)
+always@(*) begin
+illegal = 1'b0;   // overridden below for unknown opcodes / compressed
 if(inst[1:0]==2'b11)
 case(inst[6:2])
 	5'b01100:		//add and or and .....
@@ -272,54 +293,83 @@ case(inst[6:2])
 			wq=1;
 		end
 		
-		5'b11100:	//csr
+	5'b11100:	//csr
+	begin
+		s=0;
+		l=0;
+		rs2=0;
+		rd=inst[11:7];
+		alu_op=0;
+		if(inst[14]==1) begin
+			im={{27{1'b0}},inst[19:15]};
+			rs1=0;
+			end
+		else begin
+			im=0;
+			rs1=inst[19:15];	
+			end		
+		im_c=1;
+		pc_im=0;
+		pc_c=0;
+		wb_en=1;
+		b_im=0;
+		b_en=0;
+		sub=0;
+		mem_op=0;		
+		wq=0;
+	end
+
+	5'b00011: // fence / fence.i -> architectural NOP, drained externally
+	begin
+		s=0;
+		l=0;
+		rs1=0;
+		rs2=0;
+		rd=0;
+		alu_op=0;
+		im=0;
+		im_c=0;
+		pc_im=0;
+		pc_c=0;
+		wb_en=0;
+		b_im=0;
+		b_en=0;
+		mem_op=0;
+		sub=0;
+		wq=0;
+	end
+
+default:
+		// Unknown RV32I opcode: emit a safe NOP (wb_en=0, no memory, no
+		// branch) and flag `illegal` so csr_reg.v raises a spec-compliant
+		// M-mode IllegalInstruction exception (mcause=2) when this
+		// instruction reaches WB.
 		begin
 			s=0;
 			l=0;
+			rs1=0;
 			rs2=0;
-			rd=inst[11:7];
+			rd=0;
 			alu_op=0;
-			if(inst[14]==1) begin
-				im={{27{1'b0}},inst[19:15]};
-				rs1=0;
-				end
-			else begin
-				im=0;
-				rs1=inst[19:15];	
-				end		
-			im_c=1;
+			im=0;
+			im_c=0;
 			pc_im=0;
 			pc_c=0;
-			wb_en=1;
+			wb_en=0;
 			b_im=0;
 			b_en=0;
 			sub=0;
-			mem_op=0;		
+			mem_op=0;
 			wq=0;
-		end
-		
-	default: 
-		begin
-			s=1'bx;
-			l=1'bx;
-			rs1={{5{1'bx}}};
-			rs2={{5{1'bx}}};
-			rd={{5{1'bx}}};
-			alu_op={{3{1'bx}}};
-			im={{32{1'bx}}};
-			im_c=1'bx;
-			pc_im={{21{1'bx}}};			//or stop
-			pc_c={{2{1'b0}}};
-			wb_en=1'bx;
-			b_im={{13{1'bx}}};
-			b_en={1'b0,1'b0};
-			sub=1'bx;
-			mem_op=3'bxxx;
-			wq=0;
+			illegal=1'b1;
 		end
 	endcase
 	else
 	   		begin
+			// inst[1:0] != 2'b11: compressed encoding (or truly unknown).
+			// This core does not implement C, so treat non-zero values as
+			// illegal while keeping the all-zero case as a non-trapping
+			// pipeline bubble (reset / flushed-fetch / explicit NOP).
 			s=0;
 			l=0;
 			rs1=0;
@@ -336,7 +386,10 @@ case(inst[6:2])
 			mem_op=0;
 			sub=0;
 			wq=0;
+			if(inst != 32'h0000_0000)
+				illegal = 1'b1;
 		end
+end
 	
 	
 	always@(*)

@@ -133,46 +133,53 @@ assign bus_data_in=ram_data_in | reg_data | led_r_data | key_r_data | uart_r_dat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////
-//reg e_inter=0;
-//initial
-//begin
-//e_inter=0;
-//# 2000
-//e_inter=1;
-//#40
-//e_inter=0;
-//end
-////////////////////////////////////////////
-reg e_inter_d1;
-reg e_inter_d2;
+// Interrupt synchroniser.
+//
+// The `e_inter` pad is active-low (board button / external source
+// pulls it low to request).  We invert and double-flop it onto `cpu_clk`
+// to get a clean level-sensitive MEIP for the CSR file; software in
+// the handler is responsible for clearing the underlying source (or
+// masking mie.MEIE) before re-enabling interrupts.
+//
+// `time_e_inter` from the CLINT is already synchronous to cpu_clk and
+// is now itself a level-sensitive MTIP, so it goes straight through.
+reg meip_sync0, meip_sync1;
 always@(posedge cpu_clk) begin
-    // External interrupt is synchronized and ORed with the timer interrupt source.
-    e_inter_d1<= (~e_inter)|time_e_inter;
-    e_inter_d2<=e_inter_d1;
+    if (rst_n == 0) begin
+        meip_sync0 <= 1'b0;
+        meip_sync1 <= 1'b0;
+    end else begin
+        meip_sync0 <= ~e_inter;
+        meip_sync1 <=  meip_sync0;
     end
+end
+wire meip_level = meip_sync1;
+wire mtip_level = time_e_inter;
+////////////////////////////////////////////
 
 //cpu_core
 cpu_jh a1 (
   .clk(cpu_clk) ,
   .cpu_rst(rst_n & down_load_key) ,
-  .bus_data_in(d_data_in) , 
-  .d_bus_ready(d_bus_ready) , 
+  .bus_data_in(d_data_in) ,
+  .d_bus_ready(d_bus_ready) ,
   .i_bus_ready(1'b1),
   .i_data_in(i_data_in) ,
-  .pc_set_en(1'b0) , 
-  
+  .pc_set_en(1'b0) ,
+
   .pc_set_data(0),
-  .e_inter(e_inter_d1 & (~e_inter_d2)) ,
-  
+  .mtip(mtip_level),
+  .meip(meip_level),
+
   .data_addr_out(d_addr),
   .d_data_out(d_data_out)  ,
   .d_bus_en(d_bus_en)  ,
   .i_bus_en(i_bus_en)  ,
   .pc_addr_out(pc_addr_out) ,
-  
-  .ram_we(d_ram_we), 
+
+  .ram_we(d_ram_we),
   .ram_re(d_ram_re),
-  
+
   .mem_op_out(d_mem_op_in)
   );
   

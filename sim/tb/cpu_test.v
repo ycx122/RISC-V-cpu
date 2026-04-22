@@ -83,6 +83,40 @@ initial begin
     end
 end
 
+// Optional external-interrupt assertion.  cpu_soc's `e_inter` pin is the
+// active-low external interrupt source: the SoC inverts and synchronises
+// it onto cpu_clk to produce a level-sensitive MEIP into the CSR file.
+// With `e_inter` permanently high the core never sees an async interrupt,
+// which is fine for ordinary ISA regression but hides the interrupt-mepc
+// path entirely.  When run with `+EINT_AT=<ns>` we assert the source at
+// that simulation time and leave it asserted: because the interrupt is
+// level-sensitive, the handler is expected to either clear the source
+// (not modelled on this board) or permanently mask MIE.
+integer eint_when;
+initial begin
+    if ($value$plusargs("EINT_AT=%d", eint_when)) begin
+        #(eint_when);
+        e_inter = 0;   // assert MEIP and leave it asserted
+    end
+end
+
+// Optional simulation watchdog for debugging hangs: enable with +WATCHDOG.
+// Dumps CPU state (PC, key CSRs, GPRs) and finishes the sim when it fires,
+// so a hung vvp does not need to be killed with `timeout`.
+initial begin : sim_watchdog
+    if ($test$plusargs("WATCHDOG")) begin
+        #5_000_000;
+        $display("[sim] WATCHDOG fired @%0t: x26=%0d x27=%0d x3=%0d pc=%h mstatus=%h mcause=%h mepc=%h mtvec=%h",
+            $time,
+            uu1.a1.b2.regs[26], uu1.a1.b2.regs[27], uu1.a1.b2.regs[3],
+            uu1.a1.pc_addr_out,
+            uu1.a1.a5.mstatus, uu1.a1.a5.mcause, uu1.a1.a5.mepc, uu1.a1.a5.mtvec);
+        for (r = 1; r < 32; r = r + 1)
+            $display("x%2d = 0x%x", r, uu1.a1.b2.regs[r]);
+        $finish;
+    end
+end
+
 initial 
 begin
 // Keep interrupts inactive, pulse reset, then wait for the test protocol

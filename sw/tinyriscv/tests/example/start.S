@@ -40,4 +40,12 @@ _start:
 
 
 loop:
+#ifdef SIM_PASS_MARKER
+    /* Signal the Icarus testbench (sim/tb/cpu_test.v) that main()
+     * completed.  x26==1 means "finished"; x27==1 means "pass".  Kept
+     * behind a macro so this object file is still usable on real
+     * hardware and in FreeRTOS/CoreMark builds that do not exit. */
+    li x26, 1
+    li x27, 1
+#endif
     j loop

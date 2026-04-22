@@ -52,8 +52,29 @@ test_if_asynchronous:
     j asynchronous_return
 
 handle_synchronous:
+#ifdef SIM_PANIC_ON_SYNC
+    /* Simulation-only panic on synchronous exceptions.
+     *
+     * The default behaviour below (mepc += 4 then mret) silently skips
+     * the offending instruction, which masks real bugs (e.g. load/store
+     * access faults from a bad pointer walk).  For benchmark bring-up
+     * like Dhrystone we want any sync exception to stop the world, so
+     * the testbench sees TEST_FAIL with `fail testnum` = mcause.
+     *
+     * Protocol matches sim/tb/cpu_test.v: x26==1 marks finished, x27==1
+     * marks pass, and x3 is printed as `fail testnum` on failure.  We
+     * forward mcause/mepc/mtval into x3/x4/x5 so the tb register dump
+     * shows exactly which instruction faulted and why. */
+    mv   x3, a0         /* x3 = mcause  (appears as "fail testnum" in tb) */
+    mv   x4, a1         /* x4 = mepc    (faulting PC) */
+    csrr x5, 0x343      /* x5 = mtval   (bad address / bad instruction) */
+    li   x26, 1         /* finished */
+    li   x27, 0         /* fail */
+1:  j 1b
+#else
     addi a1, a1, 4
     csrw mepc, a1
+#endif
 
 asynchronous_return:
     LOAD x1, 1*REGBYTES(sp)

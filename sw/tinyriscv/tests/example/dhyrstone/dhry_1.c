@@ -18,12 +18,24 @@
 #include "dhry.h"
 //#include "string.h"
 //#include <stdlib.h>
+#include "../include/xprintf.h"
 
 #define printf xprintf
 /* Global Variables: */
 
 Rec_Pointer     Ptr_Glob,
                 Next_Ptr_Glob;
+/* Two real storage cells for the Dhrystone "heap".  The upstream code
+ * pointed Ptr_Glob / Next_Ptr_Glob at hard-coded RAM addresses
+ * (0x2000F700 / 0x2000F000).  On this SoC that window sits inside the
+ * linker's `.bss` region (bss ends around 0x20012854 with the current
+ * build), so the 72-byte Rec_Type writes through those pointers would
+ * clobber unrelated globals (including the xprintf function pointer and
+ * gpio_*_ptr base addresses), producing mangled UART output and wild
+ * indirect branches.  Allocating real statics lets the linker place
+ * them safely in .bss with proper collision checks. */
+static Rec_Type dhry_ptr_glob_storage;
+static Rec_Type dhry_next_ptr_glob_storage;
 int             Int_Glob;
 Boolean         Bool_Glob;
 char            Ch_1_Glob,
@@ -84,6 +96,49 @@ char *strcpy(char* strDest, const char* strSrc)
     return address;
 }
 
+#ifdef CFG_SIMULATION
+static void sim_put_uint(unsigned long value)
+{
+    char buf[16];
+    int i = 0;
+
+    if (value == 0) {
+        xputc('0');
+        return;
+    }
+
+    while (value != 0) {
+        buf[i++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+
+    while (i != 0) {
+        i--;
+        xputc(buf[i]);
+    }
+}
+
+static void sim_put_fixed3(long milli_value)
+{
+    unsigned long int_part;
+    unsigned long frac_part;
+
+    if (milli_value < 0) {
+        xputc('-');
+        milli_value = -milli_value;
+    }
+
+    int_part = (unsigned long)milli_value / 1000UL;
+    frac_part = (unsigned long)milli_value % 1000UL;
+
+    sim_put_uint(int_part);
+    xputc('.');
+    xputc((char)('0' + (frac_part / 100UL)));
+    xputc((char)('0' + ((frac_part / 10UL) % 10UL)));
+    xputc((char)('0' + (frac_part % 10UL)));
+}
+#endif
+
 
 main ()
 /*****/
@@ -104,8 +159,8 @@ main ()
 
   /* Initializations */
 
-  Next_Ptr_Glob = (Rec_Pointer) 0x2000F000;//malloc (sizeof (Rec_Type));
-  Ptr_Glob = (Rec_Pointer) 0x2000F700;//malloc (sizeof (Rec_Type));
+  Next_Ptr_Glob = &dhry_next_ptr_glob_storage;
+  Ptr_Glob = &dhry_ptr_glob_storage;
 
   Ptr_Glob->Ptr_Comp                    = Next_Ptr_Glob;
   Ptr_Glob->Discr                       = Ident_1;
@@ -313,6 +368,48 @@ main ()
     //printf ("\n");
 
     //DMIPS_MHZ = (Dhrystones_Per_Second/8.388)/1757;
+#ifdef CFG_SIMULATION
+    {
+      /* Keep the simulation path away from xprintf("%f"): the local
+       * xprintf implementation is fine for integers/strings but its float
+       * formatting path still corrupts control flow under this RV32IM
+       * software stack, and its multi-argument integer formatting is still
+       * flaky enough to print `5` as `-5` on this benchmark's tail path.
+       * For sim bring-up we only need a stable textual result, so print the
+       * summary with xputs/xputc and local integer helpers instead. */
+      long cycles_per_run = User_Cycle / Number_Of_Runs;
+      long dmips_mhz_num = 1000000000L;              /* 1000000 * 1000 */
+      long dmips_mhz_den = cycles_per_run * 1757L;
+      long dmips_mhz_milli = dmips_mhz_num / dmips_mhz_den;
+
+      long dmips_num = ((long)Number_Of_Runs) * 100000000L;
+      long dmips_den = User_Cycle * 1757L;
+      long dmips_int = dmips_num / dmips_den;
+      long dmips_frac = ((dmips_num % dmips_den) * 1000L) / dmips_den;
+
+      xputs(" (*) User_Cycle for total run through Dhrystone with loops ");
+      sim_put_uint((unsigned long)Number_Of_Runs);
+      xputs(": \n");
+
+      xputs("The number of times the clock ticks:");
+      sim_put_uint((unsigned long)User_Cycle);
+      xputs(" \n");
+
+      xputs("       So the DMIPS/MHz can be caculated by: \n");
+      xputs("       1000000/(User_Cycle/Number_Of_Runs)/1757 = ");
+      sim_put_fixed3(dmips_mhz_milli);
+      xputs(" DMIPS/MHz\n");
+
+      xputs("       So the DMIPS can be caculated by: \n");
+      xputs("       Dhrystones_Per_Second/1757 = ");
+      sim_put_uint((unsigned long)dmips_int);
+      xputc('.');
+      xputc((char)('0' + ((dmips_frac / 100L) % 10L)));
+      xputc((char)('0' + ((dmips_frac / 10L) % 10L)));
+      xputc((char)('0' + (dmips_frac % 10L)));
+      xputs(" DMIPS\n\n");
+    }
+#else
     DMIPS_MHZ = (1000000/((float)User_Cycle/(float)Number_Of_Runs))/1757;
     float DMIPS_mark = ((float)Number_Of_Runs/((float)User_Cycle/100000000))/1757;
 
@@ -332,6 +429,7 @@ main ()
 
     printf(" DMIPS\n");
     printf ("\n");
+#endif
   }
 
 }

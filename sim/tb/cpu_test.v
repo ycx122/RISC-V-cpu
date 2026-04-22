@@ -37,15 +37,27 @@ reg clk,rst,e_inter;
     wire[31:0] x31 = uu1.a1.b2.regs[31];
 reg [31:0]r;
 
-// Probe the UART TX datapath so simulation can print characters directly.
-wire [7:0]uart_data=uu1.uart_ctr.uart_tx_data;
-
-wire uart_lunch_en=uu1.uart_ctr.tx_en_delay;
+// Simulation-side UART console:
+//
+// Print the byte when the SoC accepts a write to the UART MMIO window,
+// rather than when the serial shifter later drains it.
+//
+// Why this level instead of probing `uart_tx` directly?
+//   1. `cpu_uart` can accept writes much faster than the 115200-baud TX
+//      engine drains them, so long software strings can overflow the TX
+//      FIFO in simulation if we try to mirror the real serial path.
+//   2. For software bring-up, what we actually want is "what byte did the
+//      program ask the UART to send?"  The accepted MMIO write is exactly
+//      that event.
+//   3. This keeps the console fast: we are not forced to wait ~4340 clk
+//      per character just to see printf output in `vvp`.
+wire [7:0] uart_tx_byte  = uu1.uart_dev_wdata[7:0];
+wire       uart_tx_fire  = uu1.uart_dev_en & uu1.uart_dev_we & uu1.uart_dev_ready;
 
 always@(posedge clk)
 begin
-if(uart_lunch_en==1)
-    $write("%c",uart_data);
+if(uart_tx_fire == 1'b1)
+    $write("%c", uart_tx_byte);
 end
 
 always #10 clk=~clk;

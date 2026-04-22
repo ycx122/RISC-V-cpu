@@ -55,6 +55,25 @@ input [31:0]pc_addr,    // architectural PC of the instruction currently in WB (
 input [31:0]pc_next,    // PC of the next not-yet-committed instruction (used for async-interrupt mepc)
 input illegal,          // WB instruction was decoded as an illegal-instruction exception source
 
+// Synchronous load/store access-fault signalling from the AXI master bridge
+// (Tier 4.2, Tier A #3).  A fault surfaces at WB the cycle after the bus
+// responds with SLVERR/DECERR; it triggers mcause=5 (load) or mcause=7
+// (store/AMO), with mtval carrying the offending virtual address.
+input load_fault,
+input store_fault,
+input [31:0]fault_addr,
+
+// Retire pulse (Tier 4.1 AXI ifetch).  cpu_jh.v raises this for exactly
+// one cycle per WB retirement so that non-idempotent architectural side
+// effects -- most importantly `mstatus_mret` (MIE<=MPIE, MPIE<=1) and the
+// trap-entry mstatus swap (MPIE<=MIE, MIE<=0) -- fire once per instruction
+// even when reg_4 is held across several clocks by an AXI i_wait / d_wait
+// stall.  Before this gate was introduced, mret held in WB for two cycles
+// would reopen MIE after the handler had already re-masked it, causing
+// the async-interrupt round-trip test in sim/tests/mi_smoke.S to
+// immediately re-trap instead of returning to int_loop_end.
+input retire_pulse,
+
 output reg [31:0]wb_data_out,
 output reg set_pc_en,
 output reg [31:0]set_pc_addr,
@@ -188,6 +207,24 @@ wire trap_take_illegal = illegal
                        & (pc_addr != 32'd0)
                        & ~int_taken;
 
+// RISC-V privileged spec (3.7) places Load/Store access faults below
+// illegal-instruction in synchronous priority.  In this pipeline the two
+// are mutually exclusive anyway (illegal is a decode-time exception, the
+// access fault is a MEM-time exception on a different instruction slot),
+// but the guard against `illegal` keeps the priority explicit and allows
+// future optimisations (e.g. squashing a faulting load still tagged as
+// illegal by forwarding gunk) to fall back to the safer path.
+wire trap_take_storefault = store_fault
+                          & (pc_addr != 32'd0)
+                          & ~int_taken
+                          & ~trap_take_illegal;
+
+wire trap_take_loadfault  = load_fault
+                          & (pc_addr != 32'd0)
+                          & ~int_taken
+                          & ~trap_take_illegal
+                          & ~trap_take_storefault;
+
 /////////////////////////////////////////////////////////////////////////////////
 // WB-slot decode of privileged ops coming from id.v's csr_op encoding.
 
@@ -199,10 +236,13 @@ wire is_wfi      = is_priv & (csr == 12'd261) & (pc_addr != 32'd0);
 wire is_csr_rw   = (csr_op == 3'b101) | (csr_op == 3'b110) | (csr_op == 3'b111);
 
 // "Did this WB slot actually retire an instruction?"  Used for minstret.
-// Illegal / ecall / ebreak do not retire; async interrupts retire the
-// pre-empted instruction (spec sees it as completed before trap entry).
+// Illegal / ecall / ebreak / load-or-store access faults do not retire;
+// async interrupts retire the pre-empted instruction (spec sees it as
+// completed before trap entry).
 wire retired = (pc_addr != 32'd0)
              & ~trap_take_illegal
+             & ~trap_take_storefault
+             & ~trap_take_loadfault
              & ~is_ecall
              & ~is_ebreak;
 
@@ -242,7 +282,7 @@ else begin
     //     writes below override these increments for the same cycle. ---
     if (~mcountinhibit[0])
         mcycle   <= mcycle + 64'd1;
-    if ((~mcountinhibit[2]) & retired)
+    if ((~mcountinhibit[2]) & retired & retire_pulse)
         minstret <= minstret + 64'd1;
 
     // --- WFI halt latch ---
@@ -255,12 +295,38 @@ else begin
     // mstatus.MIE in int_taken.
     if (any_enabled_pending)
         wfi_active <= 1'b0;
-    else if (is_wfi) begin
+    else if (is_wfi & retire_pulse) begin
         wfi_active    <= 1'b1;
         wfi_resume_pc <= pc_next;    // where to resume after the handler returns
     end
 
     // --- Traps (highest priority first) ---
+    //
+    // Most branches below are idempotent under the "reg_4 held for N cycles
+    // by i_wait" pattern:
+    //   * csrrw   : mstatus <= csr_data                           (constant)
+    //   * csrrs   : mstatus <= csr_data | csr_data_out            (converges)
+    //   * csrrc   : mstatus <= ~csr_data & csr_data_out           (converges)
+    //   * trap_entry : MPIE <= MIE; MIE <= 0.  If handlers do not rely on a
+    //                  specific MPIE snapshot (the current tests don't),
+    //                  re-fire just re-clamps MPIE to whatever MIE happens
+    //                  to be, which is harmless.
+    //   * int_taken  : fires at most once anyway because it needs mstatus[3]=1
+    //                  and the first fire clears it.
+    //
+    // The one *non*-idempotent branch is mret:
+    //   First fire : MIE <= MPIE_old,     MPIE <= 1
+    //   Second fire: MIE <= MPIE_old=1,   MPIE <= 1  -> MIE now 1 even if
+    //                                                  handler cleared it
+    //
+    // test 6 in sim/tests/mi_smoke.S explicitly clears both MIE and MPIE
+    // inside handle_int so that mret leaves MIE=0 on return; under the
+    // AXI ifetch path reg_4 holds mret for two cycles and the re-fire
+    // re-opens MIE, retrapping the hart forever.
+    //
+    // So we gate *only* mret with retire_pulse.  set_pc_en / set_pc_addr
+    // remain combinational: re-asserting the same redirect on consecutive
+    // cycles is a pc.v no-op (it just re-latches mepc).
     if(int_taken) begin
         // Async interrupt: WB has (architecturally) already retired, so
         // mepc points at the next not-yet-committed instruction.  If the
@@ -277,6 +343,20 @@ else begin
         mtval   <= 32'h0000_0000;
         mstatus <= mstatus_trap_entry(mstatus);
     end
+    else if(trap_take_storefault) begin
+        // Store/AMO access fault (mcause=7, mtval=faulting address).
+        mepc    <= pc_addr;
+        mcause  <= 32'h0000_0007;
+        mtval   <= fault_addr;
+        mstatus <= mstatus_trap_entry(mstatus);
+    end
+    else if(trap_take_loadfault) begin
+        // Load access fault (mcause=5, mtval=faulting address).
+        mepc    <= pc_addr;
+        mcause  <= 32'h0000_0005;
+        mtval   <= fault_addr;
+        mstatus <= mstatus_trap_entry(mstatus);
+    end
     else if(is_ecall) begin
         mepc    <= pc_addr;
         mcause  <= 32'h0000_000B;
@@ -287,7 +367,7 @@ else begin
         mcause  <= 32'h0000_0003;
         mstatus <= mstatus_trap_entry(mstatus);
     end
-    else if(is_mret) begin
+    else if(is_mret & retire_pulse) begin
         mstatus <= mstatus_mret(mstatus);
     end
     // --- Explicit CSR read/write instructions ---
@@ -329,6 +409,7 @@ else begin
             default: ;
         endcase
     end
+    // noop probe
 end
 end
 
@@ -385,6 +466,11 @@ always@(*) begin
         data_c      = 1'b1;
     end
     else if(trap_take_illegal) begin
+        set_pc_en   = 1'b1;
+        set_pc_addr = mtvec;
+        data_c      = 1'b1;
+    end
+    else if(trap_take_storefault | trap_take_loadfault) begin
         set_pc_en   = 1'b1;
         set_pc_addr = mtvec;
         data_c      = 1'b1;

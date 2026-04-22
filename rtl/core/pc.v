@@ -1,10 +1,18 @@
 // Program counter.
 //
-// Four writable paths, listed in priority order:
+// Five writable paths, listed in priority order:
 //
 //   * trap_set_en / trap_set_addr : highest priority.  Used by csr_reg
 //     on traps (ecall, ebreak, mret, machine-timer interrupt).  Bypasses
 //     pc_en so a stalled fetch can still redirect to the trap vector.
+//
+//   * pending_redirect_en / pending_redirect_target : ID-stage redirect
+//     that fired while pc_en was low (I-Cache miss drain window) and was
+//     latched by cpu_jh.v's pending_redirect register.  Gated by pc_en
+//     so the replay happens on the first cycle pc advances again.
+//     Priority-wise this wins over the live id_mispred_en because by the
+//     time we replay, the originating branch has already drained past
+//     reg_1; any competing id_mispred_en this cycle is a stale bubble.
 //
 //   * id_mispred_en / id_mispred_target : ID-stage branch-predictor
 //     misprediction recovery.  Fired when the architecturally-correct
@@ -33,6 +41,8 @@ module pc(
     input             pc_en,              // fetch advance enable
     input             trap_set_en,
     input      [31:0] trap_set_addr,
+    input             pending_redirect_en,
+    input      [31:0] pending_redirect_target,
     input             id_mispred_en,
     input      [31:0] id_mispred_target,
     input             bp_pred_taken,
@@ -45,7 +55,9 @@ always @(posedge clk) begin
     else if (trap_set_en)
         pc_addr <= trap_set_addr;
     else if (pc_en) begin
-        if (id_mispred_en)
+        if (pending_redirect_en)
+            pc_addr <= pending_redirect_target;
+        else if (id_mispred_en)
             pc_addr <= id_mispred_target;
         else if (bp_pred_taken)
             pc_addr <= bp_pred_target;

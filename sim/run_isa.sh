@@ -57,7 +57,6 @@ rtl_files=(
     "$repo_root/rtl/core/div_gen.v"
     "$repo_root/sim/models/xilinx_compat.v"
     "$repo_root/rtl/core/mul.v"
-    "$repo_root/rtl/interconnect/addr2c.v"
     "$repo_root/rtl/memory/ram_c.v"
     "$repo_root/rtl/common/primitives/ram.v"
     "$repo_root/rtl/peripherals/uart/rxtx.v"
@@ -65,6 +64,11 @@ rtl_files=(
     "$repo_root/rtl/memory/rodata.v"
     "$repo_root/rtl/peripherals/uart/cpu_uart.v"
     "$repo_root/rtl/common/primitives/fifo.v"
+    "$repo_root/rtl/bus/axil_master_bridge.v"
+    "$repo_root/rtl/bus/axil_slave_wrapper.v"
+    "$repo_root/rtl/bus/axil_interconnect.v"
+    "$repo_root/rtl/bus/axil_ifetch_bridge.v"
+    "$repo_root/rtl/bus/icache.v"
 )
 
 # Tests we deliberately skip because the processor does not implement
@@ -186,8 +190,13 @@ trap cleanup EXIT
 
 sim_bin="$build_dir/cpu_test_isa.out"
 
+# Extra iverilog defines can be passed through ISA_IVERILOG_DEFS, e.g.
+# ISA_IVERILOG_DEFS='-DTCM_IFETCH' bash sim/run_isa.sh to regress the
+# legacy direct-BRAM ifetch fallback instead of the AXI path.
+read -r -a _isa_extra_defs <<< "${ISA_IVERILOG_DEFS:-}"
+
 echo "[isa] Compiling testbench (iverilog)..."
-if ! iverilog -o "$sim_bin" -s cpu_test "${rtl_files[@]}" 2>"$build_dir/compile.log"; then
+if ! iverilog -o "$sim_bin" -s cpu_test "${_isa_extra_defs[@]}" "${rtl_files[@]}" 2>"$build_dir/compile.log"; then
     cat "$build_dir/compile.log" >&2
     echo "[isa] Compilation failed." >&2
     exit 1

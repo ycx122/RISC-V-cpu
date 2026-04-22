@@ -1,136 +1,94 @@
 `timescale 1ns / 1ps
-
+// -----------------------------------------------------------------------------
+// rodata - boot-ROM 32-bit data-read adapter (AXI4-Lite friendly).
+//
+// History:
+//   2026-04 (Tier 4.1): sign/zero-extension was ripped out; the ROM slave
+//                       always returns the raw aligned 32-bit word and
+//                       leaves per-size extraction to the master bridge.
+//                       i_rom port A was still 8-bit though, so the
+//                       FSM walked four byte addresses across 7 states
+//                       (12+ cycle load-to-use).
+//
+//   2026-04 (Tier 4.2): i_rom port A was widened to 32-bit read + 4-bit
+//                       byte-strobe write (see sim/models/xilinx_compat.v
+//                       and rtl/memory/ram_c.v).  This module collapses
+//                       to a 3-state FSM that clocks out the 2-cycle
+//                       BRAM output pipeline and asserts rom_r_ready in
+//                       the 3rd cycle, dropping ROM load-to-use from
+//                       ~12 cycles down to ~5 cycles end-to-end.
+//
+// Timing sketch (cycle numbers relative to the first cycle `rom_en` and
+// `re` are high, which is the first cycle the axil_slave_wrapper sits
+// in S_READ with a valid address):
+//
+//   cycle 0 (IDLE,  re=rom_en=1): addra/ena driven -> BRAM samples.
+//   cycle 1 (WAIT1)            : BRAM douta_r0 becomes valid internally.
+//   cycle 2 (WAIT2)            : BRAM douta exposes data.  rom_r_ready=1
+//                                 comb -> axil_slave_wrapper pushes
+//                                 s_rvalid=1 comb -> master captures
+//                                 rdata the same cycle.
+//
+// The FSM stays in WAIT2 (rom_r_ready=1) as long as rom_en is high, to
+// tolerate a master that is momentarily not rready.  Once the slave
+// wrapper de-asserts dev_en (and therefore rom_en), the FSM falls back
+// to IDLE on the next edge and is ready to service the next request.
+// -----------------------------------------------------------------------------
 module rodata(
-input clk,
-input rst_n,
-input rom_en,   //come from addr2c
-input [2:0]mem_op,
-input re,
-input [7:0]rom_data,
-input [31:0]addr,
+    input              clk,
+    input              rst_n,
 
-output reg [15:0]rom_addr,
-output rom_r_en,    //to rom
-output reg [31:0]reg_data,
-output reg rom_r_ready
-    );
+    // Device-side handshake (driven by axil_slave_wrapper in cpu_soc)
+    input              rom_en,     // transaction active (dev_en)
+    input              re,         // read cycle      (dev_re)
+    input      [31:0]  addr,       // 32-bit byte address (bits [1:0] ignored)
+    output     [31:0]  reg_data,   // raw 32-bit aligned word from ROM
+    output             rom_r_ready,
 
-assign rom_r_en=rom_en;
+    // i_rom port-A sharing (owned by ram_c; driven by this module
+    // whenever rom_r_en=1)
+    output     [13:0]  rom_addr,   // 14-bit word address (matches port-A width)
+    output             rom_r_en,
+    input      [31:0]  rom_data    // 32-bit word read data
+);
 
-reg [6:0] state=1;
-reg [6:0] n_state=1;
+    localparam [1:0] IDLE  = 2'd0,
+                     WAIT1 = 2'd1,
+                     WAIT2 = 2'd2;
 
-localparam	IDLE  = 7'b0000001,
-			ONE   = 7'b0000010,
-			TWO   = 7'b0000100,
-			THREE = 7'b0001000,
-			FOUR  = 7'b0010000,
-			WAIT  = 7'b0100000,
-			READY = 7'b1000000;
-			
-localparam  LB=3'b000,
-            LH=3'b001,
-            LW=3'b010,
-            LBU=3'b100,
-            LHU=3'b101;
+    reg [1:0] state;
+    reg [1:0] n_state;
 
-always@(posedge clk)
-case (state)
-     IDLE:      begin 
-        reg_data<=0;
-     end
-     ONE:      begin 
-        reg_data<=0;
-     end
-     TWO:       begin 
-        reg_data[7:0]<=rom_data;
-     end
-     THREE:       begin 
-        case(mem_op)
-            LB:  reg_data[15:8]<=(reg_data[7]==1)?8'hff:0;
-            LH:  reg_data[15:8]<=rom_data;
-            LW:  reg_data[15:8]<=rom_data;
-            LBU: reg_data[15:8]<=0;
-            LHU: reg_data[15:8]<=rom_data;
-            default:reg_data[15:8]<=0;
+    // Drive the port-A read whenever we are actively servicing a read.
+    // The slave wrapper keeps dev_en/dev_re high from the start of the
+    // transaction until dev_ready is sampled, which in turn keeps
+    // rom_r_en = 1 long enough for the 2-cycle BRAM pipeline.
+    assign rom_r_en = rom_en;
+    assign rom_addr = addr[15:2];
+
+    // reg_data is a combinational tap of the BRAM output; the master
+    // bridge latches it through the AXI R handshake.
+    assign reg_data    = rom_data;
+    assign rom_r_ready = (state == WAIT2);
+
+    always @(*) begin
+        case (state)
+            IDLE:  n_state = (re & rom_en) ? WAIT1 : IDLE;
+            WAIT1: n_state = WAIT2;
+            // Stay in WAIT2 while the slave wrapper still holds the
+            // transaction up.  Once rom_en drops (i.e. the wrapper
+            // moved back to S_IDLE after the R handshake) fall through
+            // to IDLE and be ready for the next access.
+            WAIT2: n_state = (re & rom_en) ? WAIT2 : IDLE;
+            default: n_state = IDLE;
         endcase
-     end
-     FOUR:     begin 
-        case(mem_op)
-            LB:  reg_data[23:16]<=(reg_data[7]==1)?8'hff:0;
-            LH:  reg_data[23:16]<=(reg_data[15]==1)?8'hff:0;
-            LW:  reg_data[23:16]<=rom_data;
-            LBU: reg_data[23:16]<=0;
-            LHU: reg_data[23:16]<=0;
-            default:reg_data[23:16]<=0;
-        endcase
-     end
-     WAIT:      begin 
-            case(mem_op)
-                LB:  reg_data[31:24]<=(reg_data[7]==1)?8'hff:0;
-                LH:  reg_data[31:24]<=(reg_data[15]==1)?8'hff:0;
-                LW:  reg_data[31:24]<=rom_data;
-                LBU: reg_data[31:24]<=0;
-                LHU: reg_data[31:24]<=0;
-            default: reg_data[31:24]<=0;
-     endcase
-     end
+    end
 
-endcase
+    always @(posedge clk) begin
+        if (!rst_n)
+            state <= IDLE;
+        else
+            state <= n_state;
+    end
 
-always@(*)                  //change for ruanjian
-case (state)
-     IDLE:      begin 
-        rom_addr=addr+0; 
-        rom_r_ready=0;      
-     end
-     ONE:       begin 
-        rom_addr=addr+1;      
-        rom_r_ready=0;     
-     end
-     TWO:       begin 
-        rom_addr=addr+2;       
-        rom_r_ready=0;
-     end
-     THREE:     begin 
-        rom_addr=addr+3;       
-        rom_r_ready=0;
-     end
-     FOUR:      begin 
-        rom_addr=0;       
-        rom_r_ready=0;
-     end
-     WAIT:      begin 
-        rom_addr=0;       
-        rom_r_ready=0;
-     end
-     READY:      begin 
-        rom_addr=0;       
-        rom_r_ready=1;
-     end
-     default:   begin 
-        rom_addr=0;      
-        rom_r_ready=1;
-     end
-endcase
-
-always @(*)
-    case(state)
-        IDLE:    n_state=ONE;
-        ONE:     n_state=TWO;
-        TWO:     n_state=THREE;
-        THREE:   n_state=FOUR;
-        FOUR:    n_state=WAIT;
-        WAIT:    n_state=READY;
-        READY:   n_state=IDLE;
-        default: n_state=IDLE;
-        endcase
-
-
-always @(posedge clk)
-    if(rst_n==0)
-        state<=1;
-    else if(re==1 && rom_en==1)
-        state<=n_state;
-    
 endmodule

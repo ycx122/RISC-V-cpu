@@ -64,6 +64,11 @@ module branch_unit (
     output wire [31:0] id_actual_target,
     output wire [31:0] id_actual_next_pc,
     output wire        id_mispred_en,
+    // Same condition as id_mispred_en but WITHOUT the pc_en gate.  cpu_jh.v
+    // latches this into its pending-redirect register when the branch /
+    // jump in reg_1 resolves while pc_en is low (I-Cache miss drain), so
+    // the redirect can be replayed the cycle pc_en rises.
+    output wire        id_mispred_en_raw,
     output wire [31:0] id_mispred_target,
     output wire [1:0]  c_pc,
 
@@ -122,12 +127,21 @@ module branch_unit (
     // a bubble so we never train the predictor or emit a spurious redirect.
     assign id_valid_slot = (reg_1_pcaddr != 32'd0);
 
-    // Misprediction: fetched path disagrees with ID resolution.  Gated by
-    // pc_en so a stalled branch with stale forwarded operands doesn't look
-    // like a control-flow event, and by csr_data_c so a trap commit's bigger
-    // flush always wins.
-    assign id_mispred_en     = pc_en & id_valid_slot & ~csr_data_c
+    // Raw misprediction detect: fetched path disagrees with ID resolution.
+    // Gated by csr_data_c so a trap commit's bigger flush always wins, but
+    // deliberately NOT gated by pc_en - cpu_jh.v uses the raw signal to
+    // latch a pending redirect during an I-Cache miss drain.  The existing
+    // BTB-alias clear path (reg_1 is not a branch but BPU predicted taken)
+    // is preserved here; cpu_jh.v's pending-redirect trigger adds an
+    // id_b_en != 0 gate on top of this so a NOP bubble with a stale BTB
+    // hit never latches a phantom redirect.
+    assign id_mispred_en_raw = id_valid_slot & ~csr_data_c
                              & (id_actual_next_pc != reg_1_pred_next_pc);
+    // The committed redirect signal into pc.v still requires pc_en so a
+    // stalled branch with stale forwarded operands (d_wait / local_stop)
+    // doesn't apply a redirect while the pipeline is frozen.  cpu_jh.v
+    // catches the raw pulse for replay when pc_en rises.
+    assign id_mispred_en     = pc_en & id_mispred_en_raw;
     assign id_mispred_target = id_actual_next_pc;
 
     // Flush selector kept in the legacy 2'd0 / 2'd1 encoding that flush_ctrl

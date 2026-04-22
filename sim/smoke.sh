@@ -128,7 +128,11 @@ rtl_files=(
     "$repo_root/rtl/core/div_gen.v"
     "$repo_root/sim/models/xilinx_compat.v"
     "$repo_root/rtl/core/mul.v"
-    "$repo_root/rtl/interconnect/addr2c.v"
+    "$repo_root/rtl/bus/axil_master_bridge.v"
+    "$repo_root/rtl/bus/axil_slave_wrapper.v"
+    "$repo_root/rtl/bus/axil_interconnect.v"
+    "$repo_root/rtl/bus/axil_ifetch_bridge.v"
+    "$repo_root/rtl/bus/icache.v"
     "$repo_root/rtl/memory/ram_c.v"
     "$repo_root/rtl/common/primitives/ram.v"
     "$repo_root/rtl/peripherals/uart/rxtx.v"
@@ -138,10 +142,10 @@ rtl_files=(
     "$repo_root/rtl/common/primitives/fifo.v"
 )
 
-iverilog -o "$build_dir/cpu_test_smoke.out" -s cpu_test "${rtl_files[@]}"
+iverilog ${SMOKE_IVERILOG_DEFS:-} -o "$build_dir/cpu_test_smoke.out" -s cpu_test "${rtl_files[@]}"
 
 echo "[4/4] Running simulation..."
-if ! sim_output=$(timeout "$smoke_timeout" vvp -n "$build_dir/cpu_test_smoke.out" +IROM="$build_dir/minimal_div_pass.verilog" 2>&1); then
+if ! sim_output=$(timeout "$smoke_timeout" vvp -n "$build_dir/cpu_test_smoke.out" +IROM="$build_dir/minimal_div_pass.verilog" ${SMOKE_VVP_ARGS:-} 2>&1); then
     printf '%s\n' "$sim_output"
     echo "Smoke test failed or timed out after $smoke_timeout." >&2
     exit 1

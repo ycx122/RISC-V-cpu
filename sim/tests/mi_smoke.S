@@ -159,6 +159,50 @@ wfi_site:
     bne     x28, t0, fail
 
     //--------------------------------------------------------------
+    // Test 9: Load Access Fault (Tier 4.2, Tier A #3)
+    //
+    //   A load to an unmapped MMIO address (0x5000_0000) must surface
+    //   as mcause=5, mtval=0x5000_0000, mepc=&load_fault_site.  The
+    //   cpu pipeline also has to:
+    //     * suppress the regfile write-back of the garbage DECERR rdata
+    //       (a3 must stay at its sentinel 0xbad00 value),
+    //     * keep an unrelated ALU result just after the load intact,
+    //       so the handler can resume at the nop following the load.
+    //
+    //   Handler sets x28=0xfade and bumps mepc past the load.
+    //--------------------------------------------------------------
+    li      x3, 9
+    li      x28, 0
+    li      a3, 0xbad00           // sentinel: must survive the DECERR
+    li      t1, 0x50000000
+load_fault_site:
+    lw      a3, 0(t1)             // -> DECERR, trap, rd write squashed
+    nop
+    nop
+    li      t0, 0xfade
+    bne     x28, t0, fail
+    li      t2, 0xbad00
+    bne     a3, t2, fail          // rd must not have been clobbered
+
+    //--------------------------------------------------------------
+    // Test 10: Store Access Fault
+    //
+    //   Same drill for a store.  mcause=7, mtval=0x5000_0004 (we pick
+    //   a distinct address just to confirm mtval tracks the actual
+    //   bad pointer, not some stale latch).  No rd to worry about.
+    //--------------------------------------------------------------
+    li      x3, 10
+    li      x28, 0
+    li      t1, 0x50000004
+    li      t2, 0xdeadbeef
+store_fault_site:
+    sw      t2, 0(t1)             // -> DECERR, trap
+    nop
+    nop
+    li      t0, 0xc001
+    bne     x28, t0, fail
+
+    //--------------------------------------------------------------
     // All tests passed
     //--------------------------------------------------------------
 pass:
@@ -192,6 +236,12 @@ trap_handler:
     li      t6, 2
     beq     s0, t6, handle_illegal
 
+    li      t6, 5
+    beq     s0, t6, handle_load_fault
+
+    li      t6, 7
+    beq     s0, t6, handle_store_fault
+
     j       fail                    // unexpected cause
 
 handle_illegal:
@@ -210,6 +260,24 @@ handle_ebreak:
     la      t6, ebreak_site
     bne     s1, t6, fail
     li      x28, 0xbeef
+    j       trap_return
+
+handle_load_fault:
+    la      t6, load_fault_site
+    bne     s1, t6, fail            // mepc must point at the faulting load
+    csrr    t5, mtval
+    li      t6, 0x50000000
+    bne     t5, t6, fail            // mtval must carry the faulting address
+    li      x28, 0xfade
+    j       trap_return
+
+handle_store_fault:
+    la      t6, store_fault_site
+    bne     s1, t6, fail
+    csrr    t5, mtval
+    li      t6, 0x50000004
+    bne     t5, t6, fail
+    li      x28, 0xc001
     j       trap_return
 
 handle_int:

@@ -131,7 +131,16 @@ rst=0;
 rst=1;
 
         wait(x26 == 32'b1)   // wait sim end, when x26 == 1
-        #100
+        // Drain window for the AXI + I-Cache ifetch path.  riscv-tests end
+        // with two back-to-back writes (s10=1 then s11=1) followed by an
+        // infinite loop.  On TCM (zero-latency fetch) the two retire one
+        // cycle apart, so #100 (5 cycles) was enough to observe x27.  With
+        // the cached AXI frontend, a cache miss that straddles the
+        // s10/s11 boundary delays the s11 retire by up to one line-fill
+        // (~10 cycles).  #500 is conservative: it still lets a genuinely
+        // failing test (s11=0) fall through to the reporting branch
+        // without inflating overall regression runtime.
+        #500
         if (x27 == 32'b1) begin
             $display("~~~~~~~~~~~~~~~~~~~ TEST_PASS ~~~~~~~~~~~~~~~~~~~");
             $display("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");

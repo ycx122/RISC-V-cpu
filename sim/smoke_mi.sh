@@ -10,7 +10,12 @@
 #   bash sim/smoke_mi.sh [--keep]
 #
 # Environment:
-#   MI_SMOKE_TIMEOUT  timeout passed to `timeout` (default: 10s)
+#   MI_SMOKE_TIMEOUT  timeout passed to `timeout` (default: 30s).  The
+#                    cached AXI ifetch path (I-Cache + 4-beat line fills +
+#                    the testbench's #500 drain window after x26==1) can
+#                    push the wall-clock runtime of a single mi_smoke run
+#                    past 10s on Icarus, so the default is sized to
+#                    absorb that without masking real hangs.
 
 set -euo pipefail
 
@@ -30,7 +35,7 @@ repo_root=$(cd "$script_dir/.." && pwd)
 toolbin="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin"
 linker_script="$repo_root/sw/tinyriscv/tests/example/d.lds"
 src_file="$repo_root/sim/tests/mi_smoke.S"
-timeout_val="${MI_SMOKE_TIMEOUT:-10s}"
+timeout_val="${MI_SMOKE_TIMEOUT:-30s}"
 
 gcc_bin="$toolbin/riscv64-unknown-elf-gcc"
 objcopy_bin="$toolbin/riscv64-unknown-elf-objcopy"
@@ -87,7 +92,6 @@ rtl_files=(
     "$repo_root/rtl/core/div_gen.v"
     "$repo_root/sim/models/xilinx_compat.v"
     "$repo_root/rtl/core/mul.v"
-    "$repo_root/rtl/interconnect/addr2c.v"
     "$repo_root/rtl/memory/ram_c.v"
     "$repo_root/rtl/common/primitives/ram.v"
     "$repo_root/rtl/peripherals/uart/rxtx.v"
@@ -95,6 +99,11 @@ rtl_files=(
     "$repo_root/rtl/memory/rodata.v"
     "$repo_root/rtl/peripherals/uart/cpu_uart.v"
     "$repo_root/rtl/common/primitives/fifo.v"
+    "$repo_root/rtl/bus/axil_master_bridge.v"
+    "$repo_root/rtl/bus/axil_slave_wrapper.v"
+    "$repo_root/rtl/bus/axil_interconnect.v"
+    "$repo_root/rtl/bus/axil_ifetch_bridge.v"
+    "$repo_root/rtl/bus/icache.v"
 )
 
 iverilog -o "$build_dir/cpu_test_mi.out" -s cpu_test ${MI_IVERILOG_DEFS:-} "${rtl_files[@]}"

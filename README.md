@@ -39,6 +39,14 @@
 
 前置：仓库附带的 RISC-V 工具链与 `iverilog` / `vvp`。
 
+`sw/FreeRTOS-Kernel` 以 git submodule 形式纳入，克隆时需要带上 `--recursive`，否则 FreeRTOS 相关目标无法构建：
+
+```bash
+git clone --recursive https://github.com/ycx122/RISC-V-cpu.git
+# 如果已经 clone 过但漏了 submodule：
+git submodule update --init --recursive
+```
+
 最小冒烟仿真（确认工具链 + RTL + 仿真器链路正常）：
 
 ```bash

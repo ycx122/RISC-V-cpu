@@ -27,8 +27,13 @@
 //     0x2000_0000 - 0x2FFF_FFFF : data RAM  (ram_c)
 //     0x4000_0000 - 0x40FF_FFFF : LED
 //     0x4100_0000 - 0x41FF_FFFF : KEY
-//     0x4200_0000 - 0x42FF_FFFF : CLINT
+//     0x4200_0000 - 0x42FF_FFFF : CLINT  (SiFive layout: msip@+0x0000,
+//                                         mtimecmp@+0x4000, mtime@+0xBFF8)
 //     0x4300_0000 - 0x43FF_FFFF : UART16550-ish
+//     0x4400_0000 - 0x44FF_FFFF : PLIC   (SiFive layout: prio@+0x0000,
+//                                         pending@+0x1000, enable@+0x2000,
+//                                         threshold@+0x200000,
+//                                         claim/complete@+0x200004)
 //
 //   Any Xilinx AXI4-Lite peripheral (MIG's AXI-Lite facade, axi_uart16550,
 //   axi_qspi, axi_dma's config port, ...) can now be bolted onto the
@@ -101,7 +106,8 @@ module cpu_soc (
     wire [2:0]  d_mem_op_in;
     wire        d_bus_en;
     wire        d_bus_ready;
-    wire        d_bus_err;     // 1-cycle pulse w/ d_bus_ready: AXI SLVERR/DECERR
+    wire        d_bus_err;       // 1-cycle pulse w/ d_bus_ready: AXI SLVERR/DECERR
+    wire        d_bus_misalign;  // 1-cycle pulse w/ d_bus_ready: misaligned load/store (Tier A #2)
     wire        d_ram_we;
     wire        d_ram_re;
 
@@ -124,20 +130,25 @@ module cpu_soc (
 
     // Interrupt synchroniser.  `e_inter` is the active-low external
     // interrupt pin (board button / external source pulls it low).  Invert
-    // and double-flop onto cpu_clk to get a clean level-sensitive MEIP.
-    // `time_e_inter` from the CLINT is already cpu_clk synchronous.
-    reg meip_sync0, meip_sync1;
+    // and double-flop onto cpu_clk to get a clean level-sensitive request
+    // line that is then fed to the PLIC as source #1; the PLIC performs
+    // enable/priority/threshold arbitration and drives meip into the core.
+    reg eirq_sync0, eirq_sync1;
     always @(posedge cpu_clk) begin
         if (rst_n == 1'b0) begin
-            meip_sync0 <= 1'b0;
-            meip_sync1 <= 1'b0;
+            eirq_sync0 <= 1'b0;
+            eirq_sync1 <= 1'b0;
         end else begin
-            meip_sync0 <= ~e_inter;
-            meip_sync1 <=  meip_sync0;
+            eirq_sync0 <= ~e_inter;
+            eirq_sync1 <=  eirq_sync0;
         end
     end
+    wire ext_irq_level = eirq_sync1;     // PLIC source 1
+
+    // Driven by the CLINT and PLIC instances below.
     wire time_e_inter;
-    wire meip_level = meip_sync1;
+    wire msip_level;
+    wire meip_level;          // from PLIC (any enabled source > threshold)
     wire mtip_level = time_e_inter;
 
     // fence.i invalidate pulse from the pipeline.  Connected to the
@@ -150,14 +161,16 @@ module cpu_soc (
         .clk        (cpu_clk),
         .cpu_rst    (rst_n & down_load_key),
         .bus_data_in(d_data_in),
-        .d_bus_ready(d_bus_ready),
-        .d_bus_err  (d_bus_err),
-        .i_bus_ready(ifetch_i_ready),
+        .d_bus_ready   (d_bus_ready),
+        .d_bus_err     (d_bus_err),
+        .d_bus_misalign(d_bus_misalign),
+        .i_bus_ready   (ifetch_i_ready),
         .i_data_in  (ifetch_i_data),
         .pc_set_en  (1'b0),
         .pc_set_data(32'd0),
         .mtip       (mtip_level),
         .meip       (meip_level),
+        .msip       (msip_level),
 
         .data_addr_out(d_addr),
         .d_data_out   (d_data_out),
@@ -198,9 +211,10 @@ module cpu_soc (
         .d_addr     (d_addr),
         .d_data_out (d_data_out),
         .mem_op     (d_mem_op_in),
-        .bus_data_in(d_data_in),
-        .d_bus_ready(d_bus_ready),
-        .d_bus_err  (d_bus_err),
+        .bus_data_in   (d_data_in),
+        .d_bus_ready   (d_bus_ready),
+        .d_bus_err     (d_bus_err),
+        .d_bus_misalign(d_bus_misalign),
 
         .m_awvalid  (m_awvalid),
         .m_awready  (m_awready),
@@ -243,6 +257,7 @@ module cpu_soc (
     `AXIL_SLAVE_SIG(key_s);
     `AXIL_SLAVE_SIG(clnt_s);
     `AXIL_SLAVE_SIG(uart_s);
+    `AXIL_SLAVE_SIG(plic_s);
 
     `undef AXIL_SLAVE_SIG
 
@@ -289,7 +304,13 @@ module cpu_soc (
         .uart_wdata (uart_s_wdata),  .uart_wstrb (uart_s_wstrb),  .uart_wvalid (uart_s_wvalid),  .uart_wready (uart_s_wready),
         .uart_bresp (uart_s_bresp),  .uart_bvalid(uart_s_bvalid), .uart_bready (uart_s_bready),
         .uart_araddr(uart_s_araddr), .uart_arprot(uart_s_arprot), .uart_arvalid(uart_s_arvalid), .uart_arready(uart_s_arready),
-        .uart_rdata (uart_s_rdata),  .uart_rresp (uart_s_rresp),  .uart_rvalid (uart_s_rvalid),  .uart_rready (uart_s_rready)
+        .uart_rdata (uart_s_rdata),  .uart_rresp (uart_s_rresp),  .uart_rvalid (uart_s_rvalid),  .uart_rready (uart_s_rready),
+
+        .plic_awaddr(plic_s_awaddr), .plic_awprot(plic_s_awprot), .plic_awvalid(plic_s_awvalid), .plic_awready(plic_s_awready),
+        .plic_wdata (plic_s_wdata),  .plic_wstrb (plic_s_wstrb),  .plic_wvalid (plic_s_wvalid),  .plic_wready (plic_s_wready),
+        .plic_bresp (plic_s_bresp),  .plic_bvalid(plic_s_bvalid), .plic_bready (plic_s_bready),
+        .plic_araddr(plic_s_araddr), .plic_arprot(plic_s_arprot), .plic_arvalid(plic_s_arvalid), .plic_arready(plic_s_arready),
+        .plic_rdata (plic_s_rdata),  .plic_rresp (plic_s_rresp),  .plic_rvalid (plic_s_rvalid),  .plic_rready (plic_s_rready)
     );
 
     // -------------------------------------------------------------------------
@@ -527,16 +548,21 @@ module cpu_soc (
         .dev_ready(clnt_dev_ready)
     );
 
+    // SiFive-style CLINT: msip at +0x0000, mtimecmp at +0x4000, mtime at
+    // +0xBFF8.  The slave wrapper already aligned `clnt_dev_addr` on
+    // byte boundaries, so we just pass the low 16 bits through.
     clnt u_clnt (
         .clk         (cpu_clk),
         .rst_n       (rst_n),
         .clnt_en     (clnt_dev_en),
         .re          (clnt_dev_re),
         .we          (clnt_dev_we),
-        .clnt_addr   (clnt_dev_addr[4:2]),  // word-granular register select
+        .clnt_addr   (clnt_dev_addr[15:0]),
         .din         (clnt_dev_wdata),
+        .wstrb       (clnt_dev_wstrb),
         .dout        (clnt_dev_rdata),
         .clnt_ready  (clnt_dev_ready),
+        .msip        (msip_level),
         .time_e_inter(time_e_inter)
     );
 
@@ -588,6 +614,65 @@ module cpu_soc (
     );
 
     assign uart_dev_rdata = {23'd0, uart_r_data_u};
+
+    // -------------------------------------------------------------------------
+    // Slave 6 : PLIC (SiFive-style platform-level interrupt controller)
+    //
+    //   Sources wired for this SoC:
+    //     id 0 : reserved (spec-mandated, tied off)
+    //     id 1 : external interrupt pad (e_inter), already synchronised
+    //            onto cpu_clk above
+    //     id 2..7 : unused, tied to 0 (ready for future UART-RX / timer /
+    //               DMA / etc. aggregation without changing the address
+    //               map).
+    //   Output: meip_level -> cpu_jh.meip.
+    // -------------------------------------------------------------------------
+    wire        plic_dev_en;
+    wire        plic_dev_we;
+    wire        plic_dev_re;
+    wire [31:0] plic_dev_addr;
+    wire [31:0] plic_dev_wdata;
+    wire [3:0]  plic_dev_wstrb;
+    wire [31:0] plic_dev_rdata;
+    wire        plic_dev_ready;
+
+    axil_slave_wrapper u_plic_wrap (
+        .aclk    (cpu_clk),   .aresetn(rst_n),
+        .s_awaddr(plic_s_awaddr), .s_awprot(plic_s_awprot), .s_awvalid(plic_s_awvalid), .s_awready(plic_s_awready),
+        .s_wdata (plic_s_wdata),  .s_wstrb (plic_s_wstrb),  .s_wvalid (plic_s_wvalid),  .s_wready (plic_s_wready),
+        .s_bresp (plic_s_bresp),  .s_bvalid(plic_s_bvalid), .s_bready (plic_s_bready),
+        .s_araddr(plic_s_araddr), .s_arprot(plic_s_arprot), .s_arvalid(plic_s_arvalid), .s_arready(plic_s_arready),
+        .s_rdata (plic_s_rdata),  .s_rresp (plic_s_rresp),  .s_rvalid (plic_s_rvalid),  .s_rready (plic_s_rready),
+
+        .dev_en   (plic_dev_en),
+        .dev_we   (plic_dev_we),
+        .dev_re   (plic_dev_re),
+        .dev_addr (plic_dev_addr),
+        .dev_wdata(plic_dev_wdata),
+        .dev_wstrb(plic_dev_wstrb),
+        .dev_rdata(plic_dev_rdata),
+        .dev_ready(plic_dev_ready)
+    );
+
+    wire [7:0] plic_src_vec = { 6'b0, ext_irq_level, 1'b0 };
+
+    plic #(
+        .N_SRC         (8),
+        .PRIORITY_WIDTH(3)
+    ) u_plic (
+        .clk        (cpu_clk),
+        .rst_n      (rst_n),
+        .plic_en    (plic_dev_en),
+        .re         (plic_dev_re),
+        .we         (plic_dev_we),
+        .plic_addr  (plic_dev_addr[23:0]),
+        .din        (plic_dev_wdata),
+        .wstrb      (plic_dev_wstrb),
+        .dout       (plic_dev_rdata),
+        .plic_ready (plic_dev_ready),
+        .irq_sources(plic_src_vec),
+        .meip       (meip_level)
+    );
 
     // -------------------------------------------------------------------------
     // Instruction-fetch path (TCM direct-connect vs AXI4-Lite master

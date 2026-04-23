@@ -40,10 +40,12 @@ input [31:0]csr_data,
 input [2:0]csr_op,
 
 // Level-sensitive interrupt inputs.  SoC is responsible for two-flop
-// synchronisation onto `clk`.  MSIP (machine software interrupt) is not
-// wired anywhere on this board, so mip.MSIP is hardwired to 0.
+// synchronisation onto `clk`.  MSIP is driven by the CLINT's per-hart
+// software-interrupt register; MEIP by the PLIC claim pin (or, on cores
+// without a PLIC, by a raw synchronised external-interrupt pad).
 input mtip,
 input meip,
+input msip,
 
 // WB-stage observability gate.  cpu_jh.v raises this whenever reg_4
 // holds a real (non-bubble) instruction and the pipeline is actually
@@ -61,6 +63,14 @@ input illegal,          // WB instruction was decoded as an illegal-instruction 
 // (store/AMO), with mtval carrying the offending virtual address.
 input load_fault,
 input store_fault,
+// Synchronous load/store address-misaligned signalling (Tier A #2).
+// The master bridge raises these on the same cycle as d_bus_ready when
+// it detects a naturally-misaligned load/store; no AXI transaction is
+// issued in that case.  Priority (spec 3.7) sits above access-fault
+// because the misalignment is a property of the request itself and
+// should surface even on slaves that would have succeeded otherwise.
+input load_misalign,
+input store_misalign,
 input [31:0]fault_addr,
 
 // Retire pulse (Tier 4.1 AXI ifetch).  cpu_jh.v raises this for exactly
@@ -146,8 +156,8 @@ end
 
 wire [31:0] mip_eff = (mip_sw & ~32'h0000_0888)
                     | (meip ? 32'h0000_0800 : 32'h0)
-                    | (mtip ? 32'h0000_0080 : 32'h0);
-                    // MSIP left 0
+                    | (mtip ? 32'h0000_0080 : 32'h0)
+                    | (msip ? 32'h0000_0008 : 32'h0);
 
 wire any_enabled_pending = (mip_eff & mie) != 32'h0;
 
@@ -197,32 +207,55 @@ wire [31:0] async_mepc = wfi_active ? wfi_resume_pc : pc_next;
 // not implemented here).  Bit 31 set marks interrupt causes in mcause.
 wire take_mei = mip_eff[11] & mie[11];
 wire take_mti = mip_eff[7]  & mie[7];
-// wire take_msi = mip_eff[3] & mie[3];   // reserved for when SW IPI is wired
+wire take_msi = mip_eff[3]  & mie[3];
 
+// MEI > MSI > MTI per RISC-V privileged spec 3.1.9, irrespective of the
+// order we happen to write the ternary.
 wire [31:0] int_cause = take_mei ? 32'h8000_000B :
+                        take_msi ? 32'h8000_0003 :
                         take_mti ? 32'h8000_0007 :
-                                   32'h8000_0003;   // MSI fallback
+                                   32'h8000_0003;
 
 wire trap_take_illegal = illegal
                        & (pc_addr != 32'd0)
                        & ~int_taken;
 
-// RISC-V privileged spec (3.7) places Load/Store access faults below
-// illegal-instruction in synchronous priority.  In this pipeline the two
-// are mutually exclusive anyway (illegal is a decode-time exception, the
-// access fault is a MEM-time exception on a different instruction slot),
-// but the guard against `illegal` keeps the priority explicit and allows
-// future optimisations (e.g. squashing a faulting load still tagged as
-// illegal by forwarding gunk) to fall back to the safer path.
+// RISC-V privileged spec (3.7) synchronous exception priority for the
+// memory-access / illegal slot looks like (highest -> lowest):
+//   illegal-instruction (2) >
+//   load/store address misaligned (4 / 6) >
+//   load/store access fault (5 / 7)
+//
+// The misalignment flag is reported by the AXI master bridge on the
+// cycle it short-circuits the access (no AXI fired), so
+// load_misalign / store_misalign is mutually exclusive with
+// load_fault / store_fault - but explicit guards below keep the
+// priority obvious and let future code paths raise both simultaneously
+// without needing to re-derive which one wins.
+wire trap_take_storemisalign = store_misalign
+                             & (pc_addr != 32'd0)
+                             & ~int_taken
+                             & ~trap_take_illegal;
+
+wire trap_take_loadmisalign  = load_misalign
+                             & (pc_addr != 32'd0)
+                             & ~int_taken
+                             & ~trap_take_illegal
+                             & ~trap_take_storemisalign;
+
 wire trap_take_storefault = store_fault
                           & (pc_addr != 32'd0)
                           & ~int_taken
-                          & ~trap_take_illegal;
+                          & ~trap_take_illegal
+                          & ~trap_take_storemisalign
+                          & ~trap_take_loadmisalign;
 
 wire trap_take_loadfault  = load_fault
                           & (pc_addr != 32'd0)
                           & ~int_taken
                           & ~trap_take_illegal
+                          & ~trap_take_storemisalign
+                          & ~trap_take_loadmisalign
                           & ~trap_take_storefault;
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -241,6 +274,8 @@ wire is_csr_rw   = (csr_op == 3'b101) | (csr_op == 3'b110) | (csr_op == 3'b111);
 // completed before trap entry).
 wire retired = (pc_addr != 32'd0)
              & ~trap_take_illegal
+             & ~trap_take_storemisalign
+             & ~trap_take_loadmisalign
              & ~trap_take_storefault
              & ~trap_take_loadfault
              & ~is_ecall
@@ -335,12 +370,30 @@ else begin
         mcause  <= int_cause;
         mepc    <= async_mepc;
         mstatus <= mstatus_trap_entry(mstatus);
+`ifdef DEBUG_TRAP
+        $display("[TRAP async] t=%0t pc=%08x pc_next=%08x cause=%08x mip_eff=%08x mie=%08x mstatus=%08x",
+                 $time, pc_addr, pc_next, int_cause, mip_eff, mie, mstatus);
+`endif
     end
     else if(trap_take_illegal) begin
         // Synchronous illegal instruction.  mtval optional per spec; 0 here.
         mepc    <= pc_addr;
         mcause  <= 32'h0000_0002;
         mtval   <= 32'h0000_0000;
+        mstatus <= mstatus_trap_entry(mstatus);
+    end
+    else if(trap_take_storemisalign) begin
+        // Store address misaligned (mcause=6, mtval=faulting address).
+        mepc    <= pc_addr;
+        mcause  <= 32'h0000_0006;
+        mtval   <= fault_addr;
+        mstatus <= mstatus_trap_entry(mstatus);
+    end
+    else if(trap_take_loadmisalign) begin
+        // Load address misaligned (mcause=4, mtval=faulting address).
+        mepc    <= pc_addr;
+        mcause  <= 32'h0000_0004;
+        mtval   <= fault_addr;
         mstatus <= mstatus_trap_entry(mstatus);
     end
     else if(trap_take_storefault) begin
@@ -361,6 +414,10 @@ else begin
         mepc    <= pc_addr;
         mcause  <= 32'h0000_000B;
         mstatus <= mstatus_trap_entry(mstatus);
+`ifdef DEBUG_TRAP
+        $display("[TRAP ecall] t=%0t pc=%08x mtvec=%08x mstatus=%08x",
+                 $time, pc_addr, mtvec, mstatus);
+`endif
     end
     else if(is_ebreak) begin
         mepc    <= pc_addr;
@@ -470,7 +527,8 @@ always@(*) begin
         set_pc_addr = mtvec;
         data_c      = 1'b1;
     end
-    else if(trap_take_storefault | trap_take_loadfault) begin
+    else if(trap_take_storemisalign | trap_take_loadmisalign |
+            trap_take_storefault    | trap_take_loadfault) begin
         set_pc_en   = 1'b1;
         set_pc_addr = mtvec;
         data_c      = 1'b1;

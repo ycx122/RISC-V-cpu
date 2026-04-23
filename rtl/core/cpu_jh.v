@@ -33,17 +33,26 @@ module cpu_jh (
     // load/store saw an AXI SLVERR/DECERR response and has to raise a
     // Load/Store Access Fault at WB (Tier 4.2, Tier A #3).
     input             d_bus_err,
+    // 1-cycle pulse coincident with d_bus_ready: 1 => the completing
+    // load/store was naturally misaligned (LH / LW at odd alignment,
+    // SH / SW at misaligned offset).  The bridge short-circuits the
+    // access without issuing any AXI transaction; the CPU raises a
+    // Load/Store Address Misaligned exception at WB (mcause=4/6).
+    // Mutually exclusive with d_bus_err (Tier A #2).
+    input             d_bus_misalign,
     input             i_bus_ready,
     input      [31:0] i_data_in,
     input             pc_set_en,
     input      [31:0] pc_set_data,
 
-    // Level-sensitive interrupt pins (driven by the SoC / CLINT / PLIC stub):
-    //   mtip - mtime >= mtime_cmp while clnt_flag is set
-    //   meip - external interrupt line (high = request pending)
-    // Both are expected to be synchronised onto `clk` upstream.
+    // Level-sensitive interrupt pins (driven by the SoC's CLINT + PLIC):
+    //   mtip - mtime >= mtimecmp (CLINT, hart-local)
+    //   msip - software interrupt register bit 0 of hart 0 (CLINT msip[0])
+    //   meip - external interrupt line from the PLIC (claim-visible)
+    // All three are expected to be synchronised onto `clk` upstream.
     input             mtip,
     input             meip,
+    input             msip,
 
     output     [31:0] data_addr_out,
     output     [31:0] d_data_out,
@@ -235,6 +244,18 @@ module cpu_jh (
     localparam [31:0] IFETCH_BUBBLE_NOP = 32'h0000_0013;
     assign stop_cache_reg1 = i_bus_ready ? i_data_in : IFETCH_BUBBLE_NOP;
 
+    // Companion gate for reg_1_pcaddr.  The NOP-bubble injected above MUST be
+    // tagged with pcaddr==0 (and pred_taken=0) so ID treats the slot as a
+    // real bubble.  Otherwise the bubble inherits the held pc_addr (which is
+    // often a branch/jump whose BPU entry says "taken"), and ID's mispredict
+    // detector, seeing a non-branch NOP whose "next_pc = pc+4" disagrees with
+    // the predicted "next_pc = bp_target", fires a spurious redirect to pc+4
+    // -- squashing the real branch/jump that's about to be re-fetched once
+    // the I-Cache miss resolves.
+    wire [31:0] pc_out_to_reg1 = i_bus_ready ? pc_addr_reg0 : 32'd0;
+    wire        bp_taken_to_reg1  = i_bus_ready ? bp_taken  : 1'b0;
+    wire [31:0] bp_target_to_reg1 = i_bus_ready ? bp_target : 32'd0;
+
     // fence.i invalidate pulse.
     //
     // The I-Cache (rtl/bus/icache.v) snoops `flush_icache` and clears all
@@ -266,13 +287,13 @@ module cpu_jh (
     reg_1 a1_2 (
         .reg1_en      (reg1_en),
         .rom_out      (stop_cache_reg1),
-        .pc_out       (pc_addr_reg0),
+        .pc_out       (pc_out_to_reg1),
         .clk          (clk),
         .rst          (rst[0] & cpu_rst),
         .id_in        (reg_1_inst),
         .reg_2_in     (reg_1_pcaddr),
-        .bp_taken_in  (bp_taken),
-        .bp_target_in (bp_target),
+        .bp_taken_in  (bp_taken_to_reg1),
+        .bp_target_in (bp_target_to_reg1),
         .pred_taken   (reg_1_pred_taken),
         .pred_target  (reg_1_pred_target)
     );
@@ -707,12 +728,22 @@ module cpu_jh (
     // (reg_3_wq) isn't used by loads, so it needs no extra gating here -
     // csr_pc_en's existing squash already kills the ALU wq paths.
     // -------------------------------------------------------------------------
-    wire r3_load_fault  = d_bus_ready & d_bus_err & reg_3_load;
-    wire r3_store_fault = d_bus_ready & d_bus_err & reg_3_store;
+    wire r3_load_fault     = d_bus_ready & d_bus_err      & reg_3_load;
+    wire r3_store_fault    = d_bus_ready & d_bus_err      & reg_3_store;
+    // Tier A #2: misaligned load/store is a separate sync exception
+    // (mcause=4/6, higher priority than access-fault per spec 3.7) that
+    // the bridge reports on the same d_bus_ready pulse.  Like the
+    // fault path, we squash the garbage load data (bridge never issued
+    // an AXI read, so bus_data_in holds a stale rdata_latch) by
+    // clearing reg_4.rd / wb_en on misaligned loads.
+    wire r3_load_misalign  = d_bus_ready & d_bus_misalign & reg_3_load;
+    wire r3_store_misalign = d_bus_ready & d_bus_misalign & reg_3_store;
     wire [31:0] r3_fault_addr = reg_3_p_out;
 
-    wire [4:0] reg_3_rd_to_r4    = r3_load_fault ? 5'd0 : reg_3_rd_masked;
-    wire       reg_3_wb_en_to_r4 = reg_3_wb_en_masked & ~r3_load_fault;
+    wire       r3_any_load_squash  = r3_load_fault | r3_load_misalign;
+    wire [4:0] reg_3_rd_to_r4      = r3_any_load_squash ? 5'd0
+                                                        : reg_3_rd_masked;
+    wire       reg_3_wb_en_to_r4   = reg_3_wb_en_masked & ~r3_any_load_squash;
 
     // -------------------------------------------------------------------------
     // MEM/WB boundary: reg_4
@@ -725,30 +756,36 @@ module cpu_jh (
     wire        reg_4_illegal;
     wire        reg_4_load_fault;
     wire        reg_4_store_fault;
+    wire        reg_4_load_misalign;
+    wire        reg_4_store_misalign;
     wire [31:0] reg_4_fault_addr;
 
     reg_4 a4_5 (
-        .reg4_en        (reg4_en),
-        .clk            (clk),
-        .rst            (rst[3] & cpu_rst),
-        .j2_p_out       (j2_p_out),
-        .rd             (reg_3_rd_to_r4),
-        .wb_en          (reg_3_wb_en_to_r4),
-        .csr            (reg_3_csr),
-        .pcaddr         (reg_3_pcaddr),
-        .illegal        (reg_3_illegal),
-        .load_fault     (r3_load_fault),
-        .store_fault    (r3_store_fault),
-        .fault_addr     (r3_fault_addr),
-        .r4_j2_p_out    (reg_4_j2_p_out),
-        .r4_rd          (reg_4_rd),
-        .r4_wb_en       (reg_4_wb_en),
-        .r4_csr         (reg_4_csr),
-        .r4_pcaddr      (reg_4_pcaddr),
-        .r4_illegal     (reg_4_illegal),
-        .r4_load_fault  (reg_4_load_fault),
-        .r4_store_fault (reg_4_store_fault),
-        .r4_fault_addr  (reg_4_fault_addr)
+        .reg4_en           (reg4_en),
+        .clk               (clk),
+        .rst               (rst[3] & cpu_rst),
+        .j2_p_out          (j2_p_out),
+        .rd                (reg_3_rd_to_r4),
+        .wb_en             (reg_3_wb_en_to_r4),
+        .csr               (reg_3_csr),
+        .pcaddr            (reg_3_pcaddr),
+        .illegal           (reg_3_illegal),
+        .load_fault        (r3_load_fault),
+        .store_fault       (r3_store_fault),
+        .load_misalign     (r3_load_misalign),
+        .store_misalign    (r3_store_misalign),
+        .fault_addr        (r3_fault_addr),
+        .r4_j2_p_out       (reg_4_j2_p_out),
+        .r4_rd             (reg_4_rd),
+        .r4_wb_en           (reg_4_wb_en),
+        .r4_csr            (reg_4_csr),
+        .r4_pcaddr         (reg_4_pcaddr),
+        .r4_illegal        (reg_4_illegal),
+        .r4_load_fault     (reg_4_load_fault),
+        .r4_store_fault    (reg_4_store_fault),
+        .r4_load_misalign  (reg_4_load_misalign),
+        .r4_store_misalign (reg_4_store_misalign),
+        .r4_fault_addr     (reg_4_fault_addr)
     );
 
     // -------------------------------------------------------------------------
@@ -806,14 +843,17 @@ module cpu_jh (
 
         .mtip         (mtip),
         .meip         (meip),
+        .msip         (msip),
         .int_window   (int_window),
 
         .pc_addr      (reg_4_pcaddr),
         .pc_next      (reg_3_pcaddr),
-        .illegal      (reg_4_illegal),
-        .load_fault   (reg_4_load_fault),
-        .store_fault  (reg_4_store_fault),
-        .fault_addr   (reg_4_fault_addr),
+        .illegal        (reg_4_illegal),
+        .load_fault     (reg_4_load_fault),
+        .store_fault    (reg_4_store_fault),
+        .load_misalign  (reg_4_load_misalign),
+        .store_misalign (reg_4_store_misalign),
+        .fault_addr     (reg_4_fault_addr),
 
         .retire_pulse (wb_fresh),
 

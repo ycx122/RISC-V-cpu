@@ -159,7 +159,7 @@
 - **未对齐访问**：沿用旧核的"bridge 内硬补丁"策略——master bridge 发出的 AR/AW 永远对齐（强制 `awaddr[1:0]=00`），然后在字节抽取级用 `addr_latch[1:0]` 修正；不抛 `LoadAddressMisaligned` / `StoreAddressMisaligned`。这与仓库 README 已登记的架构缺口一致，`rv32mi-p-ma_*` 本来就不跑。
 - **回归**：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`），`sim/smoke_mi.sh` 全绿；`sim/run_isa.sh` / `sim/smoke_mi.sh` / `sim/smoke.sh` / `sim/bpu_bench.sh` / `scripts/lint.sh` 的 RTL 列表全部同步加入新 `rtl/bus/*.v` 并删掉 `addr2c.v`。
 
-### 2. AXI4-Lite 总线快速路径 + ROM 宽读口 ✅ · DECERR / Access Fault ✅
+### 2. AXI4-Lite 总线快速路径 + ROM 宽读口 ✅ · DECERR / Access Fault ✅ · Tier A #1/#2/#3 ✅
 
 - **位置**：`rtl/bus/axil_slave_wrapper.v`（重写为组合握手）、`rtl/memory/rodata.v`（7 态 → 3 态 FSM）、`rtl/memory/ram_c.v`（`i_rom` port A 实例化改 32-bit + byte-strobe）、`rtl/soc/cpu_soc.v`（`rom_addr_word/rom_data_word` 线宽同步）、`sim/models/xilinx_compat.v`（`i_rom` port A 32-bit 读 + 4-bit byte-write 使能仿真桩）、`sim/tests/bus_bench.S`（新增）、`sim/bus_bench.sh`（新增）。
 - **动机**：Tier 4.1 完成后用微基准量化，单次 RAM load 要 4 拍 bus 延迟（master_bridge `S_IDLE→S_R→S_DONE` 2 拍 + slave_wrapper `IDLE→READ→R-pulse` 2 拍），`.rodata` 读更是要 ~11 拍（i_rom port A 8-bit → 7 态字节 walker）。两项都是 standard AXI4-Lite 在"小从机"上常见的 handshake 冗余。
@@ -203,10 +203,53 @@
   - 任何 `[0x4400_0000, 0x1FFF_FFFF] ∪ [0x3000_0000, 0x3FFF_FFFF] ∪ [0x4400_0000, 0xFFFF_FFFF]` 范围（即六条从口窗口以外的所有地址）都会被合成为 DECERR；写不再 silent、读不再挂死；
   - 软件在 `mtvec` 处可以靠 `mcause ∈ {5, 7}` 区分 load/store access fault、靠 `mtval` 得到具体 bad pointer；
   - ROM 写（0x0000_0000 段的写事务）目前仍是 silent OK（`axil_slave_wrapper` 直接返回 OKAY），后续若要把 ROM 写也报 SLVERR，只需在 ROM 从口前后加一层过滤器重写 `bresp`，与本机制天然兼容。
+- **后续可选（Tier A #1 / #2 / 诊断告警均已完成 ✅，见下方两个子节；剩余可选项）**：
+  - 把 `axil_interconnect.v` 的 `wr_ro` 机制一般化成「按 slot 配置 `ROM=RO / RW`」，将来若 CLINT 某些字段、PLIC threshold 等变只读，直接在表里打标；
+  - 把 `d_bus_misalign` 与 `d_bus_err` 合并为 2-bit 故障码（`00=OK / 01=misalign / 10=access / 11=reserved`），可以少走一根独立线；
+  - 接上 `Zicsr` 下发的 `mtval` 宽度扩展（在 Sv32 / 64 位地址空间中该字段不止 32 bit）。
+
+#### Tier A #1 · ROM 写 SLVERR + Tier A #2 · Misaligned Load/Store Trap (mcause=4/6)
+
+- **位置**：`rtl/bus/axil_master_bridge.v`（新增 `d_bus_misalign` 输出 + S_IDLE 未对齐检测 short-circuit + `WSTRB=0` 仿真诊断）、`rtl/bus/axil_interconnect.v`（`wr_ro` + `err_bresp_slv` 合成 SLVERR）、`rtl/core/cpu_jh.v`（新增 `d_bus_misalign` 端口、`r3_load_misalign` / `r3_store_misalign` 组合信号、load rd/wb_en 屏蔽扩展到 misalign 路径）、`rtl/core/pipeline_regs.v`（`reg_4` 增加 `load_misalign` / `store_misalign` 字段）、`rtl/core/csr_reg.v`（新增 `trap_take_load/storemisalign`，在 illegal 之下 / access fault 之上排优先级，mcause=4/6 + mtval=fault_addr）、`rtl/soc/cpu_soc.v`（走线）、`sim/tests/mi_smoke.S`（新增 Test 14/15/16 + 三个对应 handler）。
+
+- **动机**：Tier 4.1/4.2/Tier A #3 落定后，剩下两类软件可观察的"静默吃掉"行为：
+  - ROM 写：`axil_slave_wrapper` + `rodata.v` 组合会接受 AW/W、回 OKAY，然后丢弃数据。对 BSP 来说，「写了然后读不回来」是极难调试的 heisenbug。
+  - Misaligned load/store：master bridge 此前把 AR/AW 的低 2 bit 直接与 0 `concat`，slave 看到的是对齐事务；软件层面观察到的是「错地址访问 + 成功读到隔壁数据」，比 silent 更糟。
+
+- **处理（Tier A #1 · ROM SLVERR）**：
+  - `axil_interconnect.v` 写通道把 ROM slot（`wr_sel_raw[0]`）从 `wr_sel` 里强行 mask 掉（`wr_sel = {wr_sel_raw[6:1], 1'b0}`），ROM 的 `awvalid / wvalid / bready` 因此永远为 0，真实 ROM slave 看不见写事务；
+  - 合成错误 slave 的状态寄存器由 `err_bvalid` 扩成 `{err_bvalid, err_bresp_slv}`：`wr_ro` 触发时锁 `err_bresp_slv=1`，下一拍 `m_bresp=SLVERR`（2'b10）；`wr_none` 触发时锁 0，保持 DECERR（2'b11）。`m_awready / m_wready` 的 combinational 1 条件从 `wr_none` 推广成 `wr_none | wr_ro`；
+  - CPU 侧零修改：master bridge 既有的 `d_bus_err = m_bresp[1]` 对 SLVERR / DECERR 同样命中，Tier A #3 的 `load_fault / store_fault` 路径直接继承。写 ROM 在 CPU 眼里就变成一次 mcause=7（Store Access Fault），mtval 是被写的 ROM 偏移。
+  - ROM 读不受影响：`rd_sel` 不做 mask，ROM `arvalid` 继续正常发起。
+
+- **处理（Tier A #2 · Misalign Trap）**：
+  - `axil_master_bridge.v` 在 S_IDLE 组合算 `misaligned_req(op, d_addr[1:0])`：byte 永远对齐；half-word 要求 `addr[0]=0`；word 要求 `addr[1:0]=0`。检测到未对齐时直接 `state <= S_DONE`，不置 `m_awvalid / m_arvalid`，只把 `addr_latch <= d_addr`（保留原始未对齐地址供 mtval 使用）并在同一拍脉冲 `d_bus_ready_r=1, d_bus_misalign_r=1, d_bus_err_r=0`；AXI 总线上永远看不到未对齐事务，所以不会污染 slave；
+  - `cpu_jh.v` 用与 Tier A #3 完全对称的语义把 misalign 传到 WB：`r3_load_misalign = d_bus_ready & d_bus_misalign & reg_3_load`，`r3_store_misalign` 同理；load rd/wb_en 屏蔽合并为 `r3_any_load_squash = r3_load_fault | r3_load_misalign`，确保 Test 15 里 `a3` 的 sentinel 不会被 stale `rdata_latch` 覆盖；
+  - `csr_reg.v` 在 `trap_take_illegal` 与 `trap_take_storefault / trap_take_loadfault` 之间插入 `trap_take_storemisalign / trap_take_loadmisalign`，严格按 RISC-V Priv 3.7 的同步异常优先级（illegal > misalign > access-fault > ecall）。trap entry 分支写 `mcause=6 / 4 + mtval=fault_addr + mepc=pc_addr`，`set_pc_en` / `data_c` 与其他同步异常共用同一组合路径；`retired`（minstret 门控）也把 misalign 排除。
+  - **行为契约**（给软件）：
+    - `LH / LHU / SH` 在 `addr[0]=1` → mcause=4/6, mtval=原地址；
+    - `LW / SW` 在 `addr[1:0]≠0` → mcause=4/6；
+    - `LB / LBU / SB` 永远对齐，无论地址如何。
+
+- **处理（`WSTRB=0` 诊断告警）**：`axil_master_bridge.v` 加 `ifndef SYNTHESIS` 包裹的 `always @(posedge aclk)`，在 W 握手成功且 `wstrb==0` 时 `$display` 一条 WARN。iverilog / Verilator 都会输出；综合被 `SYNTHESIS` 屏蔽，Vivado 不受影响。当前 `mem_ctrl.v` 不会生成 `wstrb=0` 的写，这是纯防御性断言，用于未来若引入 `sc.w` / AMO 或直接 AXI master 时定位控制信号 bug。
+
+- **Smoke 测试**（`sim/tests/mi_smoke.S`）：
+  - **Test 14 · Store misalign**：`sh t2, 0(0x2000_0001)` → 期望 `mcause=6 / mepc=&store_misalign_site / mtval=0x2000_0001`；handler 写 `x28=0x6006`。RAM 该地址永远不应被污染（没有 AXI 事务发出）。
+  - **Test 15 · Load misalign**：`lw a3, 0(0x2000_0001)` 预埋 `a3=0xbad15` sentinel → 期望 `mcause=4 / mepc=&load_misalign_site / mtval=0x2000_0001 / a3 仍为 0xbad15`（说明 rd 写回被正确屏蔽）；handler 写 `x28=0x4004`。
+  - **Test 16 · ROM write SLVERR**：`sw t2, 0(0x0000_0010)` → 期望 `mcause=7 / mepc=&rom_write_site / mtval=0x0000_0010`（handler 复用 `handle_store_fault` 并按 mepc 分支到 `handle_store_fault_rom`，写 `x28=0xc0de`）。
+  - `handle_store_fault` 重构：`store_fault_site`（Test 10，mtval=0x5000_0004，DECERR）与 `rom_write_site`（Test 16，mtval=0x0000_0010，SLVERR）按 mepc 分派到 `handle_store_fault_unmapped` / `handle_store_fault_rom`，CSR 层面区分不了 SLVERR / DECERR，故只能靠 mepc。
+
+- **回归**（三条 fetch 路径并跑 + 全脚本）：
+  - 默认 I-Cache：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`）、`sim/smoke_mi.sh` 全绿（Test 1–16 含新加 14/15/16）、`sim/smoke.sh` PASS、`sim/bpu_bench.sh` 20010 / 25019 / 30010 cyc PASS、`sim/bus_bench.sh` RAM 6.00 / ROM 8.00 cyc/iter PASS、`sim/run_os_demo.sh` PASS、`scripts/lint.sh` 全绿；
+  - `-DTCM_IFETCH` 路径：`run_isa.sh` 46/46 PASS、`smoke_mi.sh` 全绿；
+  - `-DICACHE_DISABLE` 路径：`run_isa.sh` 46/46 PASS、`smoke_mi.sh` 全绿。
+
+- **面积 / 时序**：`axil_master_bridge.v` 新增一个 `req_misaligned` 3→1 组合分支 + `d_bus_misalign_r` 单 FF；`axil_interconnect.v` 新增 `err_bresp_slv` 单 FF + 1 bit `wr_ro`；CPU 侧 `reg_4` 新增 2 bit FF。整体 <10 个 FF + 一打 LUT，对 Artix-7 100T 可忽略。关键路径未改变——misalign 检测与 `wstrb_shift` 组合同级，不延长 AW/W 到 slave 的路径。
+
 - **后续可选**：
-  - 让 ROM 写也返回 SLVERR（配合 Mmode 的写保护语义）；
-  - 对 `WSTRB=0` 的写事务做诊断告警（软件 bug 典型表现）；
-  - 将 `mcause=4` / `mcause=6` 的对齐异常一并补齐（目前 master bridge 会把未对齐访问硬切成对齐 AXI 事务，不触发 trap，与 README 记在案的缺口一致）。
+  - 让 PMP / `mtvec` 打印 / backtrace 工具链消费 mcause=4/6/7 的 mtval，形成完整的「坏指针定位」闭环；
+  - 将来若要「写到 CLINT reserved offset」「写到 PLIC pending」也报 SLVERR，只需在对应从口前加类似 `wr_ro` 过滤器；
+  - 与 Tier 3 的 A（原子）扩展联动：`LR/SC` 对 misaligned 要求额外的「Atomic access misaligned（mcause=6 或自定义）」，到时在 master bridge 的 misalign 检测里增加 op=atomic 分支即可。
 
 ### 2.5 取指走 AXI4-Lite（无 I-Cache 版）✅
 
@@ -257,9 +300,43 @@
   - `fence.i` 粒度是「整张 invalidate」，后续 `Zicbom` / `Zicbop` 可以补 per-line `CBO.INVAL`；
   - D-Cache 还没做：后续 Tier 4.2.7 的方向是把数据侧也走 cache，那时候 retire-pulse + drain 的语义已经在 I-Cache 上验证过，可以复用。
 
-### 3. CLINT + PLIC
+### 3. CLINT + PLIC ✅
 
-- 采用常见 memory map（如 SiFive 风格），提升与 OpenSBI / Linux 的兼容性。现在 CLINT 已经挂在 AXI4-Lite 上，Tier 4.1 后的下一步是把寄存器偏移与 SiFive CLINT 对齐，并补 PLIC。
+- **位置**：`rtl/peripherals/timer/clnt.v`（按 SiFive 偏移重写）、`rtl/peripherals/plic/plic.v`（新增）、`rtl/bus/axil_interconnect.v`（新增第 7 条 PLIC 从口窗口）、`rtl/soc/cpu_soc.v`（接线、e_inter→PLIC source 1、`meip`/`mtip`/`msip` 同步）、`rtl/core/csr_reg.v`（接入 `msip`、`mip.MSIP` 变成硬线、优先级排序同步）、`rtl/core/cpu_jh.v`（顶层端口透传 `msip`）、`sim/tests/mi_smoke.S`（`Test 11 = mtime sanity`、`Test 12 = MSIP round-trip`、`Test 13 = MTI round-trip`、`Test 6` 重写为 PLIC 编程后触发 MEIP）、6 份脚本 `rtl_files` 同步 `plic.v`。
+- **动机**：Tier 4.1 把 CLINT 挂上 AXI4-Lite 时沿用了私有 word-index layout（`mtime/mtimecmp` 在 word index 0/2/1/3，还有非标 `clnt_flag`）。OpenSBI / Linux device tree 默认按 SiFive CLINT 偏移 (`msip@0x0000 / mtimecmp@0x4000 / mtime@0xBFF8`) 计算，需要一次 map 对齐；外部中断目前是把 `e_inter` 直接当 `mip.MEIP`，也缺一个标准 PLIC 做优先级 / claim / complete 仲裁，跑一条中断软件就拆一次 glue。这里把两者一次做完。
+- **处理**：
+  - **CLINT SiFive 对齐**：`clnt.v` 重写地址译码，`msip@0x0000`（只有 bit0 有效，其余 WIRI）、`mtimecmp@0x4000/0x4004`、`mtime@0xBFF8/0xBFFC`，`mtimecmp` reset 为 `64'hFFFF_FFFF_FFFF_FFFF`（SiFive 同款「默认不触发」），`time_e_inter = (mtime >= mtimecmp)` 电平式输出；`clnt_flag` 非标字段彻底移除（取消「软件没设置 enable 位就不触发」这种私有语义，改回 spec）。byte-strobe 走统一 `apply_wstrb`，未使用的偏移读 0 / 写忽略。软件层 `mtime_cmp` 写入等效 AXI4-Lite 32-bit aligned store，与 OpenSBI `sbi_timer_event_start` 发出的访问形状一致。
+  - **PLIC SiFive 风格**：`rtl/peripherals/plic/plic.v` 新增 8 源 / 3-bit priority / 单 M-mode context 的极简 PLIC：
+    - `0x0000_0004..0x0000_001C`：source 1..7 priority（source 0 reserved=0）。
+    - `0x0000_1000`：pending bits[31:0]（只读镜像 `pending_r`，写忽略）。
+    - `0x0000_2000`：context 0 enable bits[31:0]。
+    - `0x0020_0000`：context 0 threshold。
+    - `0x0020_0004`：context 0 claim/complete：读 = 当前仲裁赢家 id（清该源 pending）、写 = EOI（只要 id 在 1..7 就放行 gateway）。
+    - 仲裁：`best_prio / best_id = max{prio[i] | pending_r[i] & enable_r[i]}`，同 prio 下低 id 优先；`meip = (best_prio > threshold)`，电平输出，和 SiFive 一致。
+    - gateway：源到 `pending_r` 的写入是 edge-gated 的 `gateway_r[i]`；claim 时清 `gateway_r[i]`、complete 时释放 `gateway_r[i]`——即使源端电平仍 asserted，也必须先 complete 下一次才会重新 latch，避免 storm。linter 为了避让 iverilog 里「function 输出切片」的 syntax error，按 source 单独 `for` 展开 `wstrb` 合成。
+  - **Interconnect 新从口**：`axil_interconnect.v` 加一条窗口 `0x4400_0000..0x44FF_FFFF` 指向 PLIC，其它 5 条窗口 (`ROM / RAM / LED / KEY / CLINT / UART`) 原样保留；未映射地址依旧走 DECERR 合成器（Tier A #3 的行为）。
+  - **SoC 接线**：`cpu_soc.v` 把顶层 `e_inter`（低有效）两拍同步 + 取反后作为 PLIC source 1，不再直连 CSR；PLIC 输出 `meip`、CLINT 输出 `mtip` / `msip` 三根 interrupt pin 都经 2-FF sync 后喂给 `cpu_jh`；`TCM_IFETCH` / `ICACHE_DISABLE` / 默认 I-Cache 三条编译路径保持一致。
+  - **CSR 改造**：`csr_reg.v` 新增 `msip_i` 输入（原来 `mip.MSIP` 是软件写的软位，现在改成硬线 + 电平）；`mip_eff = {meip_i, /*unused*/, mtip_i, /*unused*/, msip_i, ...} | mip_soft`；`int_cause` 的优先级继续按 spec 是 `MEI (0x8000_000B) > MSI (0x8000_0003) > MTI (0x8000_0007)`。mret / trap entry 走已有的 `mstatus_trap_entry / mstatus_mret` helper，没有新加 CSR 行为。
+  - **Smoke 测试更新**：`sim/tests/mi_smoke.S`:
+    - **Test 11**：两次 `lw` 读 `mtime_lo` 验证自增，做 SiFive 地址存在性的最低 sanity。
+    - **Test 12**：写 `CLINT.msip[0]=1`、先 mask `mie.MEIE`（避开 e_inter 仍 asserted 的 MEIP 抢占）、再开 `mstatus.MIE`；期望 `mcause=0x8000_0003`（MSI）；handler 清 `msip`、永久 mask `mstatus.MIE+MPIE`、写 `x28=0xb00b`。
+    - **Test 13**：mask `mie.MSIE`、写 `mtimecmp = mtime_lo + 1`（`mtime` 在 RMW 过程中已自增，retire 完 `sw` 时 MTIP 立刻拉起）、开 `mstatus.MIE`；期望 `mcause=0x8000_0007`（MTI）；handler 先写 `mtimecmp_hi=-1` 再写 `mtimecmp_lo=-1`（原子上抬 comparator 到「永不触发」）、永久 mask MIE+MPIE、写 `x28=0xd07`。
+    - **Test 6**（重写）：先按 spec 编程 PLIC —— `priority[1]=1`、`enable[1]=1`、`threshold=0`，再恢复 `mie.MEIE+MSIE`、开 `mstatus.MIE`。`int_loop` 里自旋等中断；期望 `mcause=0x8000_000B` 且 `mepc ∈ [int_loop, int_loop_end)`；handler 做 PLIC claim（校验返回 id=1）、write-back complete、永久 mask MIE+MPIE、把 `mepc` 改写到 `int_loop_end`、写 `x28=0xabcd`、mret。
+  - **脚本同步**：`sim/run_isa.sh` / `sim/smoke.sh` / `sim/smoke_mi.sh` / `sim/bpu_bench.sh` / `sim/bus_bench.sh` / `scripts/lint.sh` 的 `rtl_files` 全部加入 `rtl/peripherals/plic/plic.v`，否则 PLIC 在除 smoke_mi 之外的任何入口都会 elaborate 失败。
+- **回归**（三条 fetch 路径并跑 + 全套脚本）：
+  - 默认 I-Cache：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`），`sim/smoke_mi.sh` 全绿（Test 1–13 含新加的 11/12/13），`sim/smoke.sh` PASS，`scripts/lint.sh` 全绿；
+  - `-DICACHE_DISABLE`：`MI_IVERILOG_DEFS=-DICACHE_DISABLE bash sim/smoke_mi.sh` 全绿；
+  - `-DTCM_IFETCH`：`MI_IVERILOG_DEFS=-DTCM_IFETCH bash sim/smoke_mi.sh` 全绿（Test 13 最后用「mtimecmp = mtime+1」+ handler 原子 `-1 → hi/lo` 的写法才能稳定触发，偏移 32 下 TCM 0 拍取指路径会在 nop 窗口内 bne 过早 fail）。
+- **行为契约**（给软件 / DT binding）：
+  - `reg CLINT_base = 0x4200_0000; size = 0x0001_0000`；`timebase-frequency` 与 cpu_clk 相等；软件通过「先 `mtimecmp_hi=0xFFFF_FFFF`、再写 `mtimecmp_lo=new_lo`、再写 `mtimecmp_hi=new_hi`」的 SiFive 建议序列即可避免在 64-bit 跨字写时产生虚假的 MTIP 毛刺。
+  - `reg PLIC_base = 0x4400_0000; size = 0x0100_0000`；`#interrupt-cells = 1`；source 0 reserved；source 1 = 外部 `e_inter`；context 0 = hart 0 M-mode；priority 域宽 3 bit (`0..7`)；threshold/claim/complete 按 SiFive layout。OpenSBI `platform_interrupt_init` 的默认值（priority=1 / threshold=0 / enable 某源）开箱即工作。
+  - `mip.MSIP` 现在只读（硬线到 CLINT），CSR 写忽略。写软中断要走 MMIO `CLINT.msip[0]`。`mip.MEIP` 由 PLIC 电平输出决定；`mip.MTIP` 由 CLINT `(mtime >= mtimecmp)` 决定；三者都是 level-sensitive，软件可以随时 `csrr mip` 读当前瞬时状态。
+- **Artix-7 100T 资源估算**：PLIC 总共 8 源 × 3 bit priority + 8 bit enable + 8 bit pending + 8 bit gateway + 3 bit threshold + 3 bit best_prio + 4 bit best_id ≈ 70 FF + 一个 8-wide max-priority 组合比较器（7 个 3-bit compare + 2 级优先 mux），几十个 LUT。CLINT 改动只是把寄存器偏移换位，资源不变（64 bit mtime + 64 bit mtimecmp + 1 bit msip + 译码组合）。增量可以忽略。
+- **后续可选**：
+  - 扩展到 31 源（SiFive 默认 31 源单 word）或 1023 源（完整 PLIC 多 word pending/enable）；
+  - 多 hart：按 SiFive 把 `msip[1..N]` 放在 `0x0004 * hart_id`、每 hart 一个 CLINT context；PLIC 增加 context 1..N（S-mode、hart N 的 M/S）；
+  - `mtime` / `mtimecmp` 外挂到独立 timer clock（当前直接用 cpu_clk，OK 但限制了低功耗 gating）；
+  - 补一个「sstc」或 S-mode 版 CLINT/PLIC 以配合 Tier 3 的 S-mode + Sv32。
 
 ### 4. RISC-V Debug Module（JTAG）
 

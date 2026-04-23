@@ -302,9 +302,23 @@ module reg_4 (
     //   store_fault : the store completing this cycle came back with
     //                 AXI BRESP[1]=1.  WB raises mcause=7 at csr_reg.
     //   fault_addr  : the failing virtual address (reg_3_p_out).  Used
-    //                 for mtval.
+    //                 for mtval by both the access-fault and the
+    //                 misalignment paths.
+    //
+    // MEM-stage misalignment handoff (Tier A #2):
+    //   load_misalign  : load request was naturally misaligned (LH at
+    //                    odd byte, LW at non-word).  Bridge short-
+    //                    circuited the access, no AXI transaction
+    //                    fired.  WB raises mcause=4 at csr_reg.
+    //   store_misalign : same for SH / SW.  WB raises mcause=6.
+    //
+    //   The misalign and access-fault flags are mutually exclusive by
+    //   construction (a misaligned request never reaches the AXI slave,
+    //   so BRESP/RRESP is never consulted).
     input              load_fault,
     input              store_fault,
+    input              load_misalign,
+    input              store_misalign,
     input     [31:0]   fault_addr,
 
     output reg [31:0]  r4_j2_p_out,
@@ -315,31 +329,37 @@ module reg_4 (
     output reg         r4_illegal,
     output reg         r4_load_fault,
     output reg         r4_store_fault,
+    output reg         r4_load_misalign,
+    output reg         r4_store_misalign,
     output reg [31:0]  r4_fault_addr
 );
 always @(posedge clk) begin
     if (reg4_en == 1'b1) begin
         if (rst == 1'b0) begin
-            r4_j2_p_out    <= 32'd0;
-            r4_rd          <= 5'd0;
-            r4_wb_en       <= 1'b0;
-            r4_csr         <= 15'd0;
-            r4_pcaddr      <= 32'd0;
-            r4_illegal     <= 1'b0;
-            r4_load_fault  <= 1'b0;
-            r4_store_fault <= 1'b0;
-            r4_fault_addr  <= 32'd0;
+            r4_j2_p_out       <= 32'd0;
+            r4_rd             <= 5'd0;
+            r4_wb_en          <= 1'b0;
+            r4_csr            <= 15'd0;
+            r4_pcaddr         <= 32'd0;
+            r4_illegal        <= 1'b0;
+            r4_load_fault     <= 1'b0;
+            r4_store_fault    <= 1'b0;
+            r4_load_misalign  <= 1'b0;
+            r4_store_misalign <= 1'b0;
+            r4_fault_addr     <= 32'd0;
         end
         else begin
-            r4_j2_p_out    <= j2_p_out;
-            r4_rd          <= rd;
-            r4_wb_en       <= wb_en;
-            r4_csr         <= csr;
-            r4_pcaddr      <= pcaddr;
-            r4_illegal     <= illegal;
-            r4_load_fault  <= load_fault;
-            r4_store_fault <= store_fault;
-            r4_fault_addr  <= fault_addr;
+            r4_j2_p_out       <= j2_p_out;
+            r4_rd             <= rd;
+            r4_wb_en          <= wb_en;
+            r4_csr            <= csr;
+            r4_pcaddr         <= pcaddr;
+            r4_illegal        <= illegal;
+            r4_load_fault     <= load_fault;
+            r4_store_fault    <= store_fault;
+            r4_load_misalign  <= load_misalign;
+            r4_store_misalign <= store_misalign;
+            r4_fault_addr     <= fault_addr;
         end
     end
 end

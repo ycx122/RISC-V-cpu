@@ -1,0 +1,696 @@
+Archive member included to satisfy reference by file (symbol)
+
+/home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+                              /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o (__clzsi2)
+/home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+                              /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o) (__clz_tab)
+
+Discarded input sections
+
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .text.uart_putc
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .text.uart_getc_nb
+                0x0000000000000000       0x1c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskDelete
+                0x0000000000000000      0x1b4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskEndScheduler
+                0x0000000000000000       0x3c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGetTickCountFromISR
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.uxTaskGetNumberOfTasks
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.pcTaskGetName
+                0x0000000000000000       0x4c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskDelayUntil
+                0x0000000000000000       0xec /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskCatchUpTicks
+                0x0000000000000000       0x78 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskPlaceOnUnorderedEventList
+                0x0000000000000000       0xe0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskRemoveFromUnorderedEventList
+                0x0000000000000000      0x158 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskSetTimeOutState
+                0x0000000000000000       0x68 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGetCurrentTaskHandle
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGetCurrentTaskHandleForCore
+                0x0000000000000000       0x18 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.uxTaskResetEventItemValue
+                0x0000000000000000       0x2c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.ulTaskGenericNotifyTake
+                0x0000000000000000      0x158 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGenericNotifyWait
+                0x0000000000000000      0x1a0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGenericNotify
+                0x0000000000000000      0x250 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .rodata.xTaskGenericNotify
+                0x0000000000000000       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGenericNotifyFromISR
+                0x0000000000000000      0x278 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .rodata.xTaskGenericNotifyFromISR
+                0x0000000000000000       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskGenericNotifyGiveFromISR
+                0x0000000000000000      0x1b0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskGenericNotifyStateClear
+                0x0000000000000000       0x90 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.ulTaskGenericNotifyValueClear
+                0x0000000000000000       0x8c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.vTaskResetState
+                0x0000000000000000       0x64 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.prvCopyDataFromQueue
+                0x0000000000000000       0x3c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueCreateCountingSemaphore
+                0x0000000000000000       0x5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueGenericSendFromISR
+                0x0000000000000000      0x160 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueGiveFromISR
+                0x0000000000000000      0x128 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueReceive
+                0x0000000000000000      0x24c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueuePeek
+                0x0000000000000000      0x244 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueReceiveFromISR
+                0x0000000000000000      0x12c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueuePeekFromISR
+                0x0000000000000000       0xc0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.uxQueueMessagesWaiting
+                0x0000000000000000       0x54 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.uxQueueSpacesAvailable
+                0x0000000000000000       0x5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.uxQueueMessagesWaitingFromISR
+                0x0000000000000000       0x40 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.vQueueDelete
+                0x0000000000000000       0x44 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.uxQueueGetQueueItemSize
+                0x0000000000000000        0x8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.uxQueueGetQueueLength
+                0x0000000000000000        0x8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueIsQueueEmptyFromISR
+                0x0000000000000000       0x44 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueIsQueueFullFromISR
+                0x0000000000000000       0x4c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .text.vListInsertEnd
+                0x0000000000000000       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .text.vPortEndScheduler
+                0x0000000000000000        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .sdata2.ullMachineTimerCompareRegisterBase
+                0x0000000000000000        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.xPortGetFreeHeapSize
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.xPortGetMinimumEverFreeHeapSize
+                0x0000000000000000        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.vPortInitialiseBlocks
+                0x0000000000000000        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.pvPortCalloc
+                0x0000000000000000       0x5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.vPortGetHeapStats
+                0x0000000000000000       0xec /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .text.vPortHeapResetState
+                0x0000000000000000       0x2c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .text.freertos_risc_v_exception_handler
+                0x0000000000000000      0x20c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .text.freertos_risc_v_interrupt_handler
+                0x0000000000000000      0x154 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .text.freertos_risc_v_mtimer_interrupt_handler
+                0x0000000000000000      0x1a4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .text.memmove  0x0000000000000000       0x58 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .text.memcmp   0x0000000000000000       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .text.strlen   0x0000000000000000       0x1c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .text          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .data          0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .bss           0x0000000000000000        0x0 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .comment       0x0000000000000000       0x29 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+rom              0x0000000000000000 0x0000000000010000 axrl !w
+ram              0x0000000020000000 0x0000000000020000 aw !xrl
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+LOAD /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+LOAD /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a
+                0x0000000000004000                PROVIDE (__stack_size = 0x4000)
+
+.init           0x0000000000000000       0x68
+ *(SORT_NONE(.init))
+ .init          0x0000000000000000       0x68 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+                0x0000000000000000                _start
+
+.text           0x0000000000000100     0x2a60
+ *(.text.trap)
+ *(.text .text.*)
+ .text.put_uint
+                0x0000000000000100       0xa8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .text.uart_puts
+                0x00000000000001a8       0x1c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+                0x00000000000001a8                uart_puts
+ .text.uart_printf
+                0x00000000000001c4      0x238 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+                0x00000000000001c4                uart_printf
+ .text.prvResetNextTaskUnblockTime
+                0x00000000000003fc       0x38 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.prvAddCurrentTaskToDelayedList.isra.2
+                0x0000000000000434       0xf4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.prvCheckTasksWaitingTermination
+                0x0000000000000528       0xc4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.prvIdleTask
+                0x00000000000005ec       0x2c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .text.xTaskCreate
+                0x0000000000000618      0x2dc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000618                xTaskCreate
+ .text.vTaskStartScheduler
+                0x00000000000008f4       0xb0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x00000000000008f4                vTaskStartScheduler
+ .text.vTaskSuspendAll
+                0x00000000000009a4       0x18 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x00000000000009a4                vTaskSuspendAll
+ .text.xTaskGetTickCount
+                0x00000000000009bc        0xc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x00000000000009bc                xTaskGetTickCount
+ .text.xTaskIncrementTick
+                0x00000000000009c8      0x234 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x00000000000009c8                xTaskIncrementTick
+ .text.xTaskResumeAll
+                0x0000000000000bfc      0x218 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000bfc                xTaskResumeAll
+ .text.vTaskDelay
+                0x0000000000000e14       0x68 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000e14                vTaskDelay
+ .text.vTaskSwitchContext
+                0x0000000000000e7c       0xe0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000e7c                vTaskSwitchContext
+ .text.vTaskPlaceOnEventList
+                0x0000000000000f5c       0x5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000f5c                vTaskPlaceOnEventList
+ .text.xTaskRemoveFromEventList
+                0x0000000000000fb8      0x160 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000000fb8                xTaskRemoveFromEventList
+ .text.vTaskInternalSetTimeOutState
+                0x0000000000001118       0x1c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001118                vTaskInternalSetTimeOutState
+ .text.xTaskCheckForTimeOut
+                0x0000000000001134       0xe0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001134                xTaskCheckForTimeOut
+ .text.vTaskMissedYield
+                0x0000000000001214       0x10 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001214                vTaskMissedYield
+ .text.xTaskGetSchedulerState
+                0x0000000000001224       0x24 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001224                xTaskGetSchedulerState
+ .text.xTaskPriorityInherit
+                0x0000000000001248      0x150 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001248                xTaskPriorityInherit
+ .text.xTaskPriorityDisinherit
+                0x0000000000001398      0x134 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001398                xTaskPriorityDisinherit
+ .text.vTaskPriorityDisinheritAfterTimeout
+                0x00000000000014cc      0x154 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x00000000000014cc                vTaskPriorityDisinheritAfterTimeout
+ .text.pvTaskIncrementMutexHeldCount
+                0x0000000000001620       0x1c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000000001620                pvTaskIncrementMutexHeldCount
+ .text.prvIsQueueEmpty
+                0x000000000000163c       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.prvCopyDataToQueue
+                0x000000000000165c       0xe8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.prvUnlockQueue
+                0x0000000000001744      0x10c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .text.xQueueGenericReset
+                0x0000000000001850      0x100 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                0x0000000000001850                xQueueGenericReset
+ .text.xQueueGenericCreate
+                0x0000000000001950       0x98 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                0x0000000000001950                xQueueGenericCreate
+ .text.xQueueGenericSend
+                0x00000000000019e8      0x240 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                0x00000000000019e8                xQueueGenericSend
+ .text.xQueueCreateMutex
+                0x0000000000001c28       0x54 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                0x0000000000001c28                xQueueCreateMutex
+ .text.xQueueSemaphoreTake
+                0x0000000000001c7c      0x274 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                0x0000000000001c7c                xQueueSemaphoreTake
+ .text.vListInitialise
+                0x0000000000001ef0       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+                0x0000000000001ef0                vListInitialise
+ .text.vListInitialiseItem
+                0x0000000000001f10        0x8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+                0x0000000000001f10                vListInitialiseItem
+ .text.vListInsert
+                0x0000000000001f18       0x50 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+                0x0000000000001f18                vListInsert
+ .text.uxListRemove
+                0x0000000000001f68       0x34 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+                0x0000000000001f68                uxListRemove
+ .text.vPortSetupTimerInterrupt
+                0x0000000000001f9c       0x84 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000000001f9c                vPortSetupTimerInterrupt
+ .text.xPortStartScheduler
+                0x0000000000002020       0x48 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000000002020                xPortStartScheduler
+ .text.pvPortMalloc
+                0x0000000000002068      0x2a4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+                0x0000000000002068                pvPortMalloc
+ .text.vPortFree
+                0x000000000000230c      0x198 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+                0x000000000000230c                vPortFree
+ .text          0x00000000000024a4      0x120 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+                0x00000000000024a4                pxPortInitialiseStack
+                0x0000000000002504                xPortStartFirstTask
+ *fill*         0x00000000000025c4       0x3c 
+ .text.freertos_risc_v_trap_handler
+                0x0000000000002600      0x1f0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+                0x0000000000002600                freertos_risc_v_trap_handler
+ .text.uart_lock
+                0x00000000000027f0       0x18 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .text.uart_unlock
+                0x0000000000002808       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .text.watchdog_task
+                0x0000000000002828       0x68 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .text.worker_task
+                0x0000000000002890       0x90 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .text.vApplicationMallocFailedHook
+                0x0000000000002920       0x18 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                0x0000000000002920                vApplicationMallocFailedHook
+ .text.vAssertCalled
+                0x0000000000002938       0x3c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                0x0000000000002938                vAssertCalled
+ .text.startup.main
+                0x0000000000002974      0x110 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                0x0000000000002974                main
+ .text.freertos_risc_v_application_exception_handler
+                0x0000000000002a84       0x24 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                0x0000000000002a84                freertos_risc_v_application_exception_handler
+ .text.freertos_risc_v_application_interrupt_handler
+                0x0000000000002aa8       0x28 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                0x0000000000002aa8                freertos_risc_v_application_interrupt_handler
+ .text.memset   0x0000000000002ad0       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+                0x0000000000002ad0                memset
+ .text.memcpy   0x0000000000002af0       0x24 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+                0x0000000000002af0                memcpy
+ .text          0x0000000000002b14       0x4c /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+                0x0000000000002b14                __clzsi2
+                0x0000000000002b60                . = ALIGN (0x4)
+
+.rodata         0x0000000000002b60      0x380
+ *(.rodata .rodata.*)
+ .rodata.digits_lower.1025
+                0x0000000000002b60       0x11 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ *fill*         0x0000000000002b71        0x3 
+ .rodata.digits_upper.1026
+                0x0000000000002b74       0x11 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ *fill*         0x0000000000002b85        0x3 
+ .rodata.uart_printf.str1.4
+                0x0000000000002b88        0xb /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ *fill*         0x0000000000002b93        0x1 
+ .rodata.vTaskStartScheduler.str1.4
+                0x0000000000002b94        0x5 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ *fill*         0x0000000000002b99        0x3 
+ .rodata.xTaskCreate.str1.4
+                0x0000000000002b9c       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .rodata.xQueueGenericReset.str1.4
+                0x0000000000002bcc       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .rodata.pvPortMalloc.str1.4
+                0x0000000000002bfc       0x42 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ *fill*         0x0000000000002c3e        0x2 
+ .rodata.freertos_risc_v_application_exception_handler.str1.4
+                0x0000000000002c40       0x31 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x0000000000002c71        0x3 
+ .rodata.freertos_risc_v_application_interrupt_handler.str1.4
+                0x0000000000002c74       0x3c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .rodata.main.str1.4
+                0x0000000000002cb0       0x89 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x0000000000002d39        0x3 
+ .rodata.vApplicationMallocFailedHook.str1.4
+                0x0000000000002d3c       0x1a /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x0000000000002d56        0x2 
+ .rodata.vAssertCalled.str1.4
+                0x0000000000002d58       0x19 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x0000000000002d71        0x3 
+ .rodata.watchdog_task.str1.4
+                0x0000000000002d74       0x3e /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x0000000000002db2        0x2 
+ .rodata.worker_task.str1.4
+                0x0000000000002db4       0x2c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                                         0x2b (size before relaxing)
+ .rodata        0x0000000000002de0      0x100 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+                0x0000000000002de0                __clz_tab
+ *(.srodata .srodata.*)
+
+.sdata2.uxTimerIncrementsForOneTick
+                0x0000000000002ee0        0x4
+ .sdata2.uxTimerIncrementsForOneTick
+                0x0000000000002ee0        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000000002ee0                uxTimerIncrementsForOneTick
+
+.sdata2.xISRStackTop
+                0x0000000000002ee4        0x4
+ .sdata2.xISRStackTop
+                0x0000000000002ee4        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000000002ee4                xISRStackTop
+
+.rela.dyn       0x0000000000002ee8        0x0
+ .rela.init     0x0000000000002ee8        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .rela.text.xPortStartScheduler
+                0x0000000000002ee8        0x0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+                0x0000000000002ee8                . = ALIGN (0x4)
+                [!provide]                        PROVIDE (__etext = .)
+                [!provide]                        PROVIDE (_etext = .)
+
+.preinit_array  0x0000000000002ee8        0x0
+                [!provide]                        PROVIDE (__preinit_array_start = .)
+ *(.preinit_array)
+                [!provide]                        PROVIDE (__preinit_array_end = .)
+
+.init_array     0x0000000000002ee8        0x0
+                [!provide]                        PROVIDE (__init_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*))
+ *(.init_array .ctors)
+                [!provide]                        PROVIDE (__init_array_end = .)
+
+.fini_array     0x0000000000002ee8        0x0
+                [!provide]                        PROVIDE (__fini_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*))
+ *(.fini_array .dtors)
+                [!provide]                        PROVIDE (__fini_array_end = .)
+                0x0000000000002ee8                . = ALIGN (0x4)
+                0x0000000000002ee8                PROVIDE (_data_lma = LOADADDR (.data))
+
+.data           0x0000000020000000       0x10 load address 0x0000000000002ee8
+                0x0000000020000000                PROVIDE (_data = .)
+ *(.data .data.*)
+ *(.sdata .sdata.*)
+ .sdata.uxTopUsedPriority
+                0x0000000020000000        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sdata.pullNextTime
+                0x0000000020000004        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000020000004                pullNextTime
+ .sdata.pxCriticalNesting
+                0x0000000020000008        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000020000008                pxCriticalNesting
+ .sdata.xCriticalNesting
+                0x000000002000000c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x000000002000000c                xCriticalNesting
+                0x0000000020000010                . = ALIGN (0x4)
+                0x0000000020000810                PROVIDE (__global_pointer$ = (. + 0x800))
+                0x0000000020000010                PROVIDE (_edata = .)
+                [!provide]                        PROVIDE (edata = .)
+
+.bss            0x0000000020000010     0x8930
+                0x0000000020000010                PROVIDE (_fbss = .)
+                [!provide]                        PROVIDE (__bss_start = .)
+ *(.sbss .sbss.*)
+ .sbss.pxCurrentTCB
+                0x0000000020000010        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                0x0000000020000010                pxCurrentTCB
+ .sbss.pxDelayedTaskList
+                0x0000000020000014        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.pxOverflowDelayedTaskList
+                0x0000000020000018        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.uxCurrentNumberOfTasks
+                0x000000002000001c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.uxDeletedTasksWaitingCleanUp
+                0x0000000020000020        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.uxSchedulerSuspended
+                0x0000000020000024        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.uxTaskNumber
+                0x0000000020000028        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.uxTopReadyPriority
+                0x000000002000002c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xIdleTaskHandles
+                0x0000000020000030        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xNextTaskUnblockTime
+                0x0000000020000034        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xNumOfOverflows
+                0x0000000020000038        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xPendedTicks
+                0x000000002000003c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xSchedulerRunning
+                0x0000000020000040        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xTickCount
+                0x0000000020000044        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.xYieldPendings
+                0x0000000020000048        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .sbss.pullMachineTimerCompareRegister
+                0x000000002000004c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x000000002000004c                pullMachineTimerCompareRegister
+ .sbss.ullNextTime
+                0x0000000020000050        0x8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000020000050                ullNextTime
+ .sbss.xTaskReturnAddress
+                0x0000000020000058        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                0x0000000020000058                xTaskReturnAddress
+ .sbss.pxEnd    0x000000002000005c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.xFreeBytesRemaining
+                0x0000000020000060        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.xMinimumEverFreeBytesRemaining
+                0x0000000020000064        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.xNumberOfSuccessfulAllocations
+                0x0000000020000068        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.xNumberOfSuccessfulFrees
+                0x000000002000006c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.xStart   0x0000000020000070        0x8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .sbss.task_done
+                0x0000000020000078        0x2 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *fill*         0x000000002000007a        0x2 
+ .sbss.uart_mutex
+                0x000000002000007c        0x4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ *(.bss .bss.*)
+ .bss.pxReadyTasksLists
+                0x0000000020000080       0x64 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .bss.xDelayedTaskList1
+                0x00000000200000e4       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .bss.xDelayedTaskList2
+                0x00000000200000f8       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .bss.xPendingReadyList
+                0x000000002000010c       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .bss.xTasksWaitingTermination
+                0x0000000020000120       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ *fill*         0x0000000020000134        0xc 
+ .bss.xISRStack
+                0x0000000020000140      0x800 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .bss.ucHeap    0x0000000020000940     0x8000 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ *(COMMON)
+                0x0000000020008940                . = ALIGN (0x4)
+                0x0000000020008940                PROVIDE (_end = .)
+                [!provide]                        PROVIDE (end = .)
+
+.stack          0x000000002001c000     0x4000
+                [!provide]                        PROVIDE (__stack_bottom = .)
+                0x0000000020020000                . = (. + __stack_size)
+ *fill*         0x000000002001c000     0x4000 
+                0x0000000020020000                PROVIDE (__stack_top = .)
+                [!provide]                        PROVIDE (__heap_start = _end)
+                [!provide]                        PROVIDE (__heap_end = __stack_bottom)
+
+/DISCARD/
+ *(.note.*)
+ *(.comment)
+ *(.eh_frame)
+OUTPUT(freertos_demo elf32-littleriscv)
+
+.riscv.attributes
+                0x0000000000000000       0x21
+ .riscv.attributes
+                0x0000000000000000       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .riscv.attributes
+                0x0000000000000021       0x1f /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .riscv.attributes
+                0x0000000000000040       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .riscv.attributes
+                0x0000000000000061       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .riscv.attributes
+                0x0000000000000082       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .riscv.attributes
+                0x00000000000000a3       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .riscv.attributes
+                0x00000000000000c4       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .riscv.attributes
+                0x00000000000000e5       0x1f /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .riscv.attributes
+                0x0000000000000104       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .riscv.attributes
+                0x0000000000000125       0x21 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .riscv.attributes
+                0x0000000000000146       0x21 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .riscv.attributes
+                0x0000000000000167       0x21 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_info     0x0000000000000000     0x9db4
+ .debug_info    0x0000000000000000      0x5bd /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_info    0x00000000000005bd       0x26 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .debug_info    0x00000000000005e3     0x2bfd /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_info    0x00000000000031e0     0x239d /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_info    0x000000000000557d      0xb77 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_info    0x00000000000060f4      0xb5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_info    0x0000000000006c50      0xf5c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_info    0x0000000000007bac       0x22 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .debug_info    0x0000000000007bce      0x845 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_info    0x0000000000008413      0x260 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_info    0x0000000000008673      0xbd7 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .debug_info    0x000000000000924a      0xb6a /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_abbrev   0x0000000000000000     0x1b6f
+ .debug_abbrev  0x0000000000000000      0x243 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_abbrev  0x0000000000000243       0x14 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .debug_abbrev  0x0000000000000257      0x4df /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_abbrev  0x0000000000000736      0x3c1 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_abbrev  0x0000000000000af7      0x24d /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_abbrev  0x0000000000000d44      0x2cc /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_abbrev  0x0000000000001010      0x3b6 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_abbrev  0x00000000000013c6       0x12 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .debug_abbrev  0x00000000000013d8      0x29a /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_abbrev  0x0000000000001672       0xd3 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_abbrev  0x0000000000001745      0x242 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .debug_abbrev  0x0000000000001987      0x1e8 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_loc      0x0000000000000000     0x3da2
+ .debug_loc     0x0000000000000000      0x525 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_loc     0x0000000000000525     0x1987 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_loc     0x0000000000001eac     0x132b /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_loc     0x00000000000031d7       0x94 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_loc     0x000000000000326b       0x35 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_loc     0x00000000000032a0      0x485 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_loc     0x0000000000003725      0x212 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_loc     0x0000000000003937      0x400 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_loc     0x0000000000003d37       0x6b /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+
+.debug_aranges  0x0000000000000000      0x480
+ .debug_aranges
+                0x0000000000000000       0x40 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_aranges
+                0x0000000000000040       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .debug_aranges
+                0x0000000000000060      0x168 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_aranges
+                0x00000000000001c8       0xd8 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_aranges
+                0x00000000000002a0       0x40 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_aranges
+                0x00000000000002e0       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_aranges
+                0x0000000000000310       0x58 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_aranges
+                0x0000000000000368       0x40 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .debug_aranges
+                0x00000000000003a8       0x60 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_aranges
+                0x0000000000000408       0x40 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_aranges
+                0x0000000000000448       0x20 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .debug_aranges
+                0x0000000000000468       0x18 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_ranges   0x0000000000000000      0xa78
+ .debug_ranges  0x0000000000000000      0x128 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_ranges  0x0000000000000128      0x4d0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_ranges  0x00000000000005f8      0x260 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_ranges  0x0000000000000858       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_ranges  0x0000000000000888       0x20 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_ranges  0x00000000000008a8       0x78 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_ranges  0x0000000000000920       0x38 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .debug_ranges  0x0000000000000958       0xd0 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_ranges  0x0000000000000a28       0x30 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_ranges  0x0000000000000a58       0x20 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+
+.debug_line     0x0000000000000000     0x9e74
+ .debug_line    0x0000000000000000      0x727 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_line    0x0000000000000727       0xc4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+ .debug_line    0x00000000000007eb     0x3ec1 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_line    0x00000000000046ac     0x27fa /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_line    0x0000000000006ea6      0x6ae /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_line    0x0000000000007554      0x42e /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_line    0x0000000000007982      0xe8e /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_line    0x0000000000008810      0x349 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+ .debug_line    0x0000000000008b59      0x77c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_line    0x00000000000092d5      0x3a1 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_line    0x0000000000009676      0x440 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+ .debug_line    0x0000000000009ab6      0x3be /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_str      0x0000000000000000     0x220a
+ .debug_str     0x0000000000000000      0x208 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+                                        0x263 (size before relaxing)
+ .debug_str     0x0000000000000208       0x34 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_start.o
+                                         0x63 (size before relaxing)
+ .debug_str     0x000000000000023c     0x1084 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+                                       0x1268 (size before relaxing)
+ .debug_str     0x00000000000012c0      0x501 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+                                        0xd5d (size before relaxing)
+ .debug_str     0x00000000000017c1       0x70 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+                                        0x6d0 (size before relaxing)
+ .debug_str     0x0000000000001831      0x164 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+                                        0x71f (size before relaxing)
+ .debug_str     0x0000000000001995      0x313 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+                                        0x8ef (size before relaxing)
+ .debug_str     0x0000000000001ca8       0x46 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_portASM.o
+                                         0x81 (size before relaxing)
+ .debug_str     0x0000000000001cee      0x13d /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+                                        0x3e9 (size before relaxing)
+ .debug_str     0x0000000000001e2b       0x54 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+                                        0x1b8 (size before relaxing)
+ .debug_str     0x0000000000001e7f      0x38b /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)
+                                        0x82d (size before relaxing)
+ .debug_str     0x000000000000220a      0x810 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_frame    0x0000000000000000      0xd9c
+ .debug_frame   0x0000000000000000       0x94 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/bsp_uart.o
+ .debug_frame   0x0000000000000094      0x61c /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_tasks.o
+ .debug_frame   0x00000000000006b0      0x3a4 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_queue.o
+ .debug_frame   0x0000000000000a54       0x60 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_list.o
+ .debug_frame   0x0000000000000ab4       0x58 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_port.o
+ .debug_frame   0x0000000000000b0c      0x124 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/rtos_heap_4.o
+ .debug_frame   0x0000000000000c30       0xec /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_main.o
+ .debug_frame   0x0000000000000d1c       0x60 /home/ycx/RISC-V-cpu/sw/programs/freertos_demo/build/app_newlib_stubs.o
+ .debug_frame   0x0000000000000d7c       0x20 /home/ycx/RISC-V-cpu/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/../lib/gcc/riscv64-unknown-elf/8.3.0/rv32im/ilp32/libgcc.a(_clzsi2.o)

@@ -11,6 +11,31 @@
 - 提供 `iverilog` 兼容模型（`sim/models/xilinx_compat.v`），可在无 Vivado 环境下做功能仿真
 - 配套 ISA 回归脚本（rv32ui + rv32um 共 46 个 PASS）
 
+## 性能指标
+
+当前 CPU 在 `sim/run_dhrystone.sh` 下的 Dhrystone 2.1 跑分如下（`-O2 -march=rv32im -mabi=ilp32`，仿真版强制 `Number_Of_Runs = 5`）：
+
+| 指标 | 数值 |
+| --- | --- |
+| 总 `mcycle` | 2534 |
+| 总 `minstret` | 1455 |
+| **Cycles / Dhrystone** | **506** |
+| Instret / Dhrystone | 291 |
+| **IPC** | **0.574** |
+| **DMIPS/MHz** | **1.124** |
+
+测量方式：`sw/tinyriscv/tests/example/dhyrstone/dhry_stubs.c` 的 `csr_cycle()` / `csr_instret()` 直接通过 `csrr` 读取架构 CSR `mcycle` / `mcycleh` 与 `minstret` / `minstreth`（用读 hi → 读 lo → 再读 hi 的标准防撕裂序列），与 SoC 上 CLINT `mtime` 的 MMIO 时基解耦。复现：
+
+```bash
+bash sim/run_dhrystone.sh
+# 关键输出：
+#   (*) Cycles per Dhrystone:  506
+#   (*) IPC (minstret/mcycle): 0.574
+#         1000000/(User_Cycle/Number_Of_Runs)/1757 = 1.124 DMIPS/MHz
+```
+
+`Cycles / Dhrystone` 与频率解耦，是后续流水线 / Cache 优化的主指标；`DMIPS/MHz ≈ 1.12` 大致处于「单发射 5 级顺序核」的常见区间（参考 SiFive E31 ≈ 1.61）。仿真版只跑 5 轮，`csrr` 自身的取样开销会带来 ~1–2 % 的轻微偏差，需要更精确数据时可以临时把 `dhry_1.c` 里的 `Number_Of_Runs` 调到 50–100 再跑。
+
 ## 目录结构
 
 | 路径 | 说明 |

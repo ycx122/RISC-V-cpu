@@ -72,16 +72,22 @@ extern long     time();
                 /* Measurements should last at least 2 seconds */
 #endif
 
-long            Begin_Cycle,
-                End_Cycle,
-                User_Cycle;
-long            Begin_Instret,
-                End_Instret,
-                User_Instret,
-                Instret;
+/* Cycle / instret CSRs are 64-bit on RV32; use 64-bit accumulators so the
+ * printed numbers stay correct for both the 5-run sim build and the
+ * 500000-run silicon build. */
+unsigned long long Begin_Cycle,
+                   End_Cycle,
+                   User_Cycle;
+unsigned long long Begin_Instret,
+                   End_Instret,
+                   User_Instret,
+                   Instret;
 long            Begin_Time,
                 End_Time,
                 User_Time;
+
+extern unsigned long long csr_cycle  (void *unused);
+extern unsigned long long csr_instret(void *unused);
 float           Microseconds,
                 Dhrystones_Per_Second;
 float           DMIPS_MHZ;
@@ -97,9 +103,9 @@ char *strcpy(char* strDest, const char* strSrc)
 }
 
 #ifdef CFG_SIMULATION
-static void sim_put_uint(unsigned long value)
+static void sim_put_uint(unsigned long long value)
 {
-    char buf[16];
+    char buf[24];
     int i = 0;
 
     if (value == 0) {
@@ -108,8 +114,8 @@ static void sim_put_uint(unsigned long value)
     }
 
     while (value != 0) {
-        buf[i++] = (char)('0' + (value % 10));
-        value /= 10;
+        buf[i++] = (char)('0' + (unsigned)(value % 10ULL));
+        value /= 10ULL;
     }
 
     while (i != 0) {
@@ -377,36 +383,60 @@ main ()
        * flaky enough to print `5` as `-5` on this benchmark's tail path.
        * For sim bring-up we only need a stable textual result, so print the
        * summary with xputs/xputc and local integer helpers instead. */
-      long cycles_per_run = User_Cycle / Number_Of_Runs;
-      long dmips_mhz_num = 1000000000L;              /* 1000000 * 1000 */
-      long dmips_mhz_den = cycles_per_run * 1757L;
-      long dmips_mhz_milli = dmips_mhz_num / dmips_mhz_den;
+      unsigned long long runs            = (unsigned long long)Number_Of_Runs;
+      unsigned long long cycles_per_run  = User_Cycle   / runs;
+      unsigned long long instret_per_run = User_Instret / runs;
 
-      long dmips_num = ((long)Number_Of_Runs) * 100000000L;
-      long dmips_den = User_Cycle * 1757L;
-      long dmips_int = dmips_num / dmips_den;
-      long dmips_frac = ((dmips_num % dmips_den) * 1000L) / dmips_den;
+      /* DMIPS/MHz in milli-units: 1e9 / (cycles_per_run * 1757). */
+      unsigned long long dmips_mhz_milli = 1000000000ULL
+                                         / (cycles_per_run * 1757ULL);
 
-      xputs(" (*) User_Cycle for total run through Dhrystone with loops ");
-      sim_put_uint((unsigned long)Number_Of_Runs);
-      xputs(": \n");
+      /* DMIPS at 1 MHz reference (Dhrystones_Per_Second / 1757), with
+       * 3 fractional digits.  Same formula as the floating path below
+       * but in fixed-point, so it works without libm. */
+      unsigned long long dmips_num  = runs * 100000000ULL;
+      unsigned long long dmips_den  = User_Cycle * 1757ULL;
+      unsigned long long dmips_int  = dmips_num / dmips_den;
+      unsigned long long dmips_frac = ((dmips_num % dmips_den) * 1000ULL)
+                                    / dmips_den;
 
-      xputs("The number of times the clock ticks:");
-      sim_put_uint((unsigned long)User_Cycle);
-      xputs(" \n");
+      /* IPC * 1000.  IPC = retired instructions / cycles. */
+      unsigned long long ipc_milli = (User_Instret * 1000ULL) / User_Cycle;
 
-      xputs("       So the DMIPS/MHz can be caculated by: \n");
+      xputs(" (*) Number_Of_Runs:        ");
+      sim_put_uint(runs);
+      xputs("\n");
+
+      xputs(" (*) Total mcycle:          ");
+      sim_put_uint(User_Cycle);
+      xputs("\n");
+
+      xputs(" (*) Total minstret:        ");
+      sim_put_uint(User_Instret);
+      xputs("\n");
+
+      xputs(" (*) Cycles per Dhrystone:  ");
+      sim_put_uint(cycles_per_run);
+      xputs("\n");
+
+      xputs(" (*) Instret per Dhrystone: ");
+      sim_put_uint(instret_per_run);
+      xputs("\n");
+
+      xputs(" (*) IPC (minstret/mcycle): ");
+      sim_put_fixed3((long)ipc_milli);
+      xputs("\n");
+
       xputs("       1000000/(User_Cycle/Number_Of_Runs)/1757 = ");
-      sim_put_fixed3(dmips_mhz_milli);
+      sim_put_fixed3((long)dmips_mhz_milli);
       xputs(" DMIPS/MHz\n");
 
-      xputs("       So the DMIPS can be caculated by: \n");
       xputs("       Dhrystones_Per_Second/1757 = ");
-      sim_put_uint((unsigned long)dmips_int);
+      sim_put_uint(dmips_int);
       xputc('.');
-      xputc((char)('0' + ((dmips_frac / 100L) % 10L)));
-      xputc((char)('0' + ((dmips_frac / 10L) % 10L)));
-      xputc((char)('0' + (dmips_frac % 10L)));
+      xputc((char)('0' + (unsigned)((dmips_frac / 100ULL) % 10ULL)));
+      xputc((char)('0' + (unsigned)((dmips_frac / 10ULL)  % 10ULL)));
+      xputc((char)('0' + (unsigned)( dmips_frac           % 10ULL)));
       xputs(" DMIPS\n\n");
     }
 #else

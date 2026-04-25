@@ -2,12 +2,19 @@
  * sw/bsp/ld/default.lds
  *
  * Default linker script for the RISC-V CPU SoC.  Matches the on-chip
- * memory sizes in rtl/memory/ram_c.v (128 KB RAM) and the BRAM-backed
+ * memory sizes in rtl/memory/ram_c.v (256 KB RAM) and the BRAM-backed
  * boot ROM (64 KB) wired up in rtl/soc/cpu_soc.v.
  *
  * Summary:
  *   ROM 0x0000_0000  64 KB   .init / .text / .rodata / .data LMA
- *   RAM 0x2000_0000 128 KB   .data VMA / .bss / heap / stack (top-down)
+ *   RAM 0x2000_0000 256 KB   .data VMA / .bss / heap / stack (top-down)
+ *
+ * 2026-04 (Tier 2 / A1+A2 scale-up): RAM doubled from 128 KB to 256 KB
+ * for the Artix-7 200T target.  The CPU's 8 KB write-back D-Cache and
+ * 4-deep store buffer make the larger working set practical without a
+ * proportional latency hit.  Stack default also bumped to 32 KB so a
+ * deeper call stack (e.g. a recursive demo or task switching) doesn't
+ * collide with the heap.
  *
  * If the image grows past 64 KB (most likely cause: enabling -O0 on a
  * big demo, or pulling in newlib's printf), swap this script for the
@@ -21,10 +28,10 @@ ENTRY(_start)
 MEMORY
 {
     rom (rxai!w) : ORIGIN = 0x00000000, LENGTH = 64K
-    ram (wa!rix) : ORIGIN = 0x20000000, LENGTH = 128K
+    ram (wa!rix) : ORIGIN = 0x20000000, LENGTH = 256K
 }
 
-PROVIDE(__stack_size = 16K);
+PROVIDE(__stack_size = 32K);
 
 SECTIONS
 {

@@ -12,6 +12,8 @@ rtl/bus/axil_slave_wrapper.v
 rtl/bus/axil_interconnect.v
 rtl/bus/axil_ifetch_bridge.v
 rtl/bus/icache.v
+rtl/bus/store_buffer.v
+rtl/bus/dcache.v
 
 # Memories
 rtl/memory/ram_c.v

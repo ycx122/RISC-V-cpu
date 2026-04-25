@@ -184,7 +184,79 @@ module cpu_soc (
     );
 
     // -------------------------------------------------------------------------
-    // AXI4-Lite master from the CPU
+    // Data-side L1 D-Cache + Store Buffer (Tier 2 / A1 + A2).
+    //
+    // The dcache sits transparently between cpu_jh's legacy data bus and
+    // the AXI4-Lite master bridge below.  It accelerates RAM (cacheable)
+    // accesses with a write-back / write-allocate cache and absorbs MMIO
+    // store latency through an integrated 4-deep store buffer.  Both the
+    // CPU and the bridge see exactly the same {d_bus_en / ram_we / ram_re
+    // / d_addr / d_data_out / mem_op / d_bus_ready / bus_data_in /
+    // d_bus_err / d_bus_misalign} handshake shape, so neither side has
+    // any visibility into the cache.
+    //
+    // Compile-time fallback: passing `-DDCACHE_DISABLE` short-circuits
+    // the cache and store buffer entirely, restoring the pre-dcache
+    // direct connection from cpu_jh to axil_master_bridge.  Use this for
+    // resource-squeeze fits and as an A/B regression switch.
+    // -------------------------------------------------------------------------
+    wire [31:0] br_d_addr;
+    wire [31:0] br_d_data_out;
+    wire        br_d_bus_en;
+    wire        br_d_ram_we;
+    wire        br_d_ram_re;
+    wire [2:0]  br_d_mem_op;
+    wire [31:0] br_d_data_in;
+    wire        br_d_bus_ready;
+    wire        br_d_bus_err;
+    wire        br_d_bus_misalign;
+
+`ifdef DCACHE_DISABLE
+    // CPU talks straight to the bridge; no D-Cache, no store buffer.
+    assign br_d_bus_en   = d_bus_en;
+    assign br_d_ram_we   = d_ram_we;
+    assign br_d_ram_re   = d_ram_re;
+    assign br_d_addr     = d_addr;
+    assign br_d_data_out = d_data_out;
+    assign br_d_mem_op   = d_mem_op_in;
+    assign d_data_in      = br_d_data_in;
+    assign d_bus_ready    = br_d_bus_ready;
+    assign d_bus_err      = br_d_bus_err;
+    assign d_bus_misalign = br_d_bus_misalign;
+`else
+    dcache u_dcache (
+        .aclk    (cpu_clk),
+        .aresetn (rst_n),
+        .flush   (1'b0),                      // no fence.i side-effects on data path
+
+        // upstream: cpu_jh data port
+        .up_d_bus_en      (d_bus_en),
+        .up_ram_we        (d_ram_we),
+        .up_ram_re        (d_ram_re),
+        .up_d_addr        (d_addr),
+        .up_d_data_out    (d_data_out),
+        .up_mem_op        (d_mem_op_in),
+        .up_bus_data_in   (d_data_in),
+        .up_d_bus_ready   (d_bus_ready),
+        .up_d_bus_err     (d_bus_err),
+        .up_d_bus_misalign(d_bus_misalign),
+
+        // downstream: axil_master_bridge
+        .dn_d_bus_en      (br_d_bus_en),
+        .dn_ram_we        (br_d_ram_we),
+        .dn_ram_re        (br_d_ram_re),
+        .dn_d_addr        (br_d_addr),
+        .dn_d_data_out    (br_d_data_out),
+        .dn_mem_op        (br_d_mem_op),
+        .dn_bus_data_in   (br_d_data_in),
+        .dn_d_bus_ready   (br_d_bus_ready),
+        .dn_d_bus_err     (br_d_bus_err),
+        .dn_d_bus_misalign(br_d_bus_misalign)
+    );
+`endif
+
+    // -------------------------------------------------------------------------
+    // AXI4-Lite master from the CPU (or D-Cache, in the default build)
     // -------------------------------------------------------------------------
     wire [31:0] m_awaddr;
     wire [2:0]  m_awprot;
@@ -205,16 +277,16 @@ module cpu_soc (
         .aclk       (cpu_clk),
         .aresetn    (rst_n),
 
-        .d_bus_en   (d_bus_en),
-        .ram_we     (d_ram_we),
-        .ram_re     (d_ram_re),
-        .d_addr     (d_addr),
-        .d_data_out (d_data_out),
-        .mem_op     (d_mem_op_in),
-        .bus_data_in   (d_data_in),
-        .d_bus_ready   (d_bus_ready),
-        .d_bus_err     (d_bus_err),
-        .d_bus_misalign(d_bus_misalign),
+        .d_bus_en   (br_d_bus_en),
+        .ram_we     (br_d_ram_we),
+        .ram_re     (br_d_ram_re),
+        .d_addr     (br_d_addr),
+        .d_data_out (br_d_data_out),
+        .mem_op     (br_d_mem_op),
+        .bus_data_in   (br_d_data_in),
+        .d_bus_ready   (br_d_bus_ready),
+        .d_bus_err     (br_d_bus_err),
+        .d_bus_misalign(br_d_bus_misalign),
 
         .m_awvalid  (m_awvalid),
         .m_awready  (m_awready),

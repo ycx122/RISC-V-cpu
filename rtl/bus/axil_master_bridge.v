@@ -362,6 +362,23 @@ module axil_master_bridge (
                      m_awaddr, op_latch, $time);
         end
     end
+`ifdef BRIDGE_TRACE
+    always @(posedge aclk) begin
+        if (aresetn) begin
+            if (m_arvalid && m_arready)
+                $display("[brm] t=%0t AR addr=%h", $time, m_araddr);
+            if (m_rvalid && m_rready)
+                $display("[brm] t=%0t R rdata=%h rresp=%b -> latch=%h ext=%h (op=%b boff=%b)",
+                         $time, m_rdata, m_rresp, m_rdata, rdata_extracted, op_latch, addr_latch[1:0]);
+            if (m_awvalid && m_awready)
+                $display("[brm] t=%0t AW addr=%h", $time, m_awaddr);
+            if (m_wvalid && m_wready)
+                $display("[brm] t=%0t W  data=%h strb=%b", $time, m_wdata, m_wstrb);
+            if (m_bvalid && m_bready)
+                $display("[brm] t=%0t B  resp=%b", $time, m_bresp);
+        end
+    end
+`endif
 `endif
 
 endmodule

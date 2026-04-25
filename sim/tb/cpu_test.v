@@ -261,16 +261,31 @@ always #10 clk=~clk;
 // bootloader.  The hex file is a flat byte-per-line dump of the `.data`
 // segment starting at the VMA base (`_ram[0]` across the four banks
 // corresponds to byte address 0x20000000).
-reg [7:0] dram_init_bytes [0:65535];
+// dram_init_bytes is sized to the largest RAM we currently target (256 KB
+// total, 64 KiB/bank).  We always zero-initialise every bank cell so any
+// stack/.bss access into RAM lands in a defined value rather than an 'X'
+// (which would propagate through compares and stall the test forever).
+// The +DRAM preload then overwrites the .data prefix.
+reg [7:0] dram_init_bytes [0:262143];   // 256 KiB
 reg [1023:0] dram_init_file;
 integer dram_i;
 initial begin
-    for (dram_i = 0; dram_i < 65536; dram_i = dram_i + 1)
+    for (dram_i = 0; dram_i < 262144; dram_i = dram_i + 1)
         dram_init_bytes[dram_i] = 8'h00;
+    // Always pre-zero every bank (65536 bytes per bank) so the entire
+    // 256 KB window starts well-defined.  The test image, when present,
+    // is only a few hundred bytes, but the stack lives at the top of
+    // RAM and would otherwise read from uninitialised cells.
+    for (dram_i = 0; dram_i < 65536; dram_i = dram_i + 1) begin
+        uu1.b1.d_ram_1.u_ram._ram[dram_i] = 8'h00;
+        uu1.b1.d_ram_2.u_ram._ram[dram_i] = 8'h00;
+        uu1.b1.d_ram_3.u_ram._ram[dram_i] = 8'h00;
+        uu1.b1.d_ram_4.u_ram._ram[dram_i] = 8'h00;
+    end
     if ($value$plusargs("DRAM=%s", dram_init_file)) begin
         $display("[sim] preloading dram from %0s", dram_init_file);
         $readmemh(dram_init_file, dram_init_bytes);
-        for (dram_i = 0; dram_i < 16384; dram_i = dram_i + 1) begin
+        for (dram_i = 0; dram_i < 65536; dram_i = dram_i + 1) begin
             uu1.b1.d_ram_1.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 0];
             uu1.b1.d_ram_2.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 1];
             uu1.b1.d_ram_3.u_ram._ram[dram_i] = dram_init_bytes[dram_i*4 + 2];

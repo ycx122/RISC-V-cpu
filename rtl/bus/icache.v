@@ -13,11 +13,20 @@
 //
 // Organisation
 // ------------
-// * 2 KB total, direct-mapped, 16 B line (4 words), 128 lines.
-//     addr[31:11]  tag    (21 b)
-//     addr[10: 4]  index  (7  b)
-//     addr[ 3: 2]  wsel   (2  b, word offset within the line)
-//     addr[ 1: 0]  byte   (always 00 for fetches; forced aligned anyway)
+// * 8 KB total, direct-mapped, 16 B line (4 words), 512 lines (default
+//   build).  Address-bit allocation is computed from NUM_LINES, so the
+//   same module covers 2 KB / 4 KB / 8 KB / 16 KB configurations
+//   without source changes:
+//
+//     addr[31: TAG_LSB]  tag  (= 32 - IDX_W - 4 bits)
+//     addr[TAG_LSB-1:4]  idx  (= log2(NUM_LINES) bits)
+//     addr[ 3: 2]        wsel (2 b, word offset within the line)
+//     addr[ 1: 0]        byte (always 00 for fetches; forced aligned)
+//
+//   2026-04 (Tier 2 / A1+A2 scale-up): default size raised from 2 KB
+//   (128 lines) to 8 KB (512 lines) to match the Artix-7 200T's BRAM
+//   headroom.  Hit rate on the long-running OS demos jumps measurably
+//   for the same code footprint that previously thrashed.
 //
 // * Combinational hit path.  In S_IDLE the index + tag + valid form a
 //   pure combinational comparator; the selected 32-bit word is driven
@@ -87,7 +96,7 @@
 
 module icache #(
     parameter LINE_BYTES = 16,
-    parameter NUM_LINES  = 128
+    parameter NUM_LINES  = 512
 ) (
     input  wire        aclk,
     input  wire        aresetn,
@@ -112,9 +121,14 @@ module icache #(
 
     // ---------------- Address geometry ----------------------------------------
     localparam WSEL_LSB  = 2;
-    localparam WSEL_W    = 2;       // 4 words per line
-    localparam IDX_LSB   = 4;       // 16 B lines
-    localparam IDX_W     = 7;       // 128 lines
+    localparam WSEL_W    = 2;                    // 4 words per line
+    localparam IDX_LSB   = 4;                    // 16 B lines
+    localparam IDX_W     = (NUM_LINES <=  32) ? 5 :
+                           (NUM_LINES <=  64) ? 6 :
+                           (NUM_LINES <= 128) ? 7 :
+                           (NUM_LINES <= 256) ? 8 :
+                           (NUM_LINES <= 512) ? 9 :
+                           (NUM_LINES <=1024) ?10 : 11;
     localparam TAG_LSB   = IDX_LSB + IDX_W;
     localparam TAG_W     = 32 - TAG_LSB;
     localparam LINE_BITS = LINE_BYTES * 8;

@@ -76,8 +76,14 @@ module ram_c(
     // -------------------------------------------------------------------------
     // 4 byte-wide BRAM banks.  Each bank has an independent write enable
     // so AXI WSTRB maps 1:1 onto per-bank writes (no rotation needed).
+    //
+    // 2026-04 scale-up: bank_addr is now 16-bit (was 15-bit) to address
+    // 64 KiB per bank (256 KB RAM total).  The cpu_soc.v wrapper drops
+    // the leading 0x2000_0000 base before forwarding `d_addr`, so bits
+    // [17:2] cover the full 256 KB window without spilling into the
+    // address tag.
     // -------------------------------------------------------------------------
-    wire [14:0] bank_addr = d_addr[16:2];
+    wire [15:0] bank_addr = d_addr[17:2];
 
     wire [3:0] bank_we = d_wstrb & {4{d_en & we}};
     wire       bank_re = d_en & re;

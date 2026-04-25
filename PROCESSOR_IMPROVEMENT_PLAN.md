@@ -99,10 +99,30 @@
 - **回归**：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`），`sim/smoke.sh` / `sim/smoke_mi.sh` 全绿；`-DBPU_DISABLE` 编译路径也通过 `run_isa.sh` 回归。
 - **后续可选**：扩大 BTB（64–128 条目），BHT 换 gshare/tournament，RAS 加预测级 push/pop 与 checkpoint 回滚。
 
-### 9. I-Cache / D-Cache
+### 9. I-Cache / D-Cache ✅
 
-- **现状**：`ram_c` 直连 BRAM，无 cache 抽象。
-- **方向**：小规模 direct-mapped I$/D$（如 2–4 KB、16B line）；若外接 DDR，cache + 标准总线几乎必做。
+- **状态**：I-Cache 在 Tier 4.2.6 完成；本节聚焦 **A1 D-Cache + A2 Store Buffer**（Tier A #1/#2）。
+- **位置**：`rtl/bus/dcache.v`（新增）、`rtl/bus/store_buffer.v`（新增）、`rtl/soc/cpu_soc.v`（在 mem_ctrl 与 `axil_master_bridge` 之间插 D-Cache，新增 `-DDCACHE_DISABLE` 旁路）、`sim/filelist/rtl_soc.f` / `scripts/lint.sh`（rtl 列表同步）。
+- **拓扑**：8 KB direct-mapped、16-byte line（4 word）、512 line；`tag=addr[31:13]`、`index=addr[12:4]`、`wsel=addr[3:2]`。Write-back、write-allocate；命中组合返回 `up_d_bus_ready` + 抽取后的字（与 I-Cache 命中等价的 0 拍消费）。
+- **可缓存域**：仅 `0x2000_0000..0x2FFF_FFFF`（数据 RAM 窗口）；ROM (`0x0xxx_xxxx`) 与 MMIO (`0x4xxx_xxxx`) 走 bypass 路径。后续若把 ROM 也纳入可缓存域，需要在 dcache 里区分「dirty 不能 evict 到 ROM」的语义。
+- **Store Buffer**：4-entry FIFO，每 entry `{addr, wdata, wstrb, op}`。两个用途：
+  1. **MMIO 写吸收**：非可缓存 store 在 SB 有空位时同拍 retire（以前每次 MMIO 写要等 AW+W+B = 2 拍）；4 个回连续 UART poke 可以一次 1 拍 retire。
+  2. **Write-back drain**：cache miss 撞到 dirty victim 时，dcache 把 4 个 dirty word push 进 SB 然后立刻发 line fill；4 个 evict word 在后台 drain 到 RAM，CPU 在 fill 完成后立刻拿到新数据。
+- **Bridge 仲裁**：D-Cache 是 `axil_master_bridge` 上唯一的 client，内部把 `S_FILL`（4-beat line read）、`S_BYPASS`（CPU 单笔 NC 访问）和 SB drain 三者按 FSM 串行化。
+- **Misalign / Access Fault**：mirror Tier A #2/#3 行为。dcache 在 IDLE 检测 misalign，直接组合给 CPU `up_d_bus_misalign=1`，绝不发 AXI；bridge 端的 fault 通过 `dn_d_bus_err` 在 S_BYPASS / S_FILL 透回 CPU；write-back drain 期间的 fault 是 imprecise（与商业 write-back cache 一致），实测 BSP 不踩，仅在故障注入测试中可见。
+- **关键 bug 与修复（`sb_pop` 时序）**：初版 `sb_pop` 是 1 拍寄存器 NB，导致在 `dn_d_bus_ready=1` 当拍 SB 还显示 `head_valid=1`，下一拍 dcache 在 S_IDLE 又给 bridge 推了**同一条**已 pop 的 entry（"幻影 drain"）。下下拍 dcache 进入 S_BYPASS 准备发 ROM read，bridge 还在做幻影 write；幻影 write 完成时给的 `d_bus_ready=1` 被 S_BYPASS 误当成自己的 read ack，把 bridge 锁存的旧 rdata（上一次 ROM 读的 0x0a）回给 CPU——`xprintf` 死循环根因。修复：把 `sb_pop` 改成 `assign sb_pop = sb_drain_active & dn_d_bus_ready;` 组合输出，让 SB 的 `valid_mem[rd_ptr]=0 / occ--` 在 ack 当拍 NB 生效，下一拍 `head_valid=0`、不再发幻影 drain。
+- **`fence.i` 顺序**：靠 `cpu_jh.v` 的 `fence_stall` 排空数据侧（即排空 SB），与现有语义兼容；dcache 的 `flush` 端口暴露在外但 cpu_soc 接 1'b0（无效化整张 cache 是简单粗暴的语义，后续可挂到 `Zicbom`）。
+- **回归**（三条 fetch 路径并跑）：
+  - 默认（`I-Cache + D-Cache`）：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`）、`sim/smoke.sh` PASS、`sim/run_dhrystone.sh` PASS（**TEST_PASS** 包括 `Str_1_Loc / Str_2_Loc` 完整字符串校验）；
+  - `-DICACHE_DISABLE`：`sim/run_isa.sh` 46/46 PASS；
+  - `-DTCM_IFETCH`：`sim/run_isa.sh` 46/46 PASS；
+  - `-DDCACHE_DISABLE`：`sim/run_isa.sh` 46/46 PASS（旁路路径与 Tier 4.2 行为一致）。
+- **资源估算（Artix-7 200T）**：tag SRAM 512 × 19 = 9.7 Kbit；data SRAM 512 × 128 bit = 64 Kbit（≈ 4 个 18-Kbit BRAM）；valid/dirty 1024 FF；FSM/比较 ~150 LUT。SB 4 × (32+32+4+3) = 284 bit ≈ 一个 distRAM；snoop 4 × 32-bit 比较器 + 字节合成 ~40 LUT。整体远小于 200T 余量。
+- **后续可选**：
+  - 扩 16 KB 或换 2-way set associative（命中率 + 抗 thrashing）；
+  - line fill 加 critical-word-first（命中拍直接给关键字，剩 3 字后台填）；
+  - dirty bit 改 per-word 而非 per-line（write-back 流量进一步减少）；
+  - 把 ROM 域也加入 cacheable（需配套加「ROM 永远不 dirty」断言，避免错误 evict）。
 
 ### 10. 流水线模块化 ✅
 
@@ -353,6 +373,26 @@
 ### 7. 容量
 
 - 当前数据 RAM 约 128 KB 级；接 DDR 后地址空间与控制器需一并规划。Tier 4.1 已把 CPU 侧对 AXI4-Lite 的依赖固化，因此换成 MIG 的 AXI4-Lite facade 时只需在 `axil_interconnect.v` 添加一条从口 bundle 即可。
+
+### 8. Artix-7 200T 资源放大配置 ✅
+
+- **位置**：`rtl/common/primitives/ram.v`（每 byte-bank 32 KiB → 64 KiB，共 256 KB RAM）、`rtl/memory/ram_c.v`（bank 地址扩位）、`rtl/bus/icache.v`（128 line → 512 line，2 KB → **8 KB** I-Cache，`IDX_W` 改成由 `NUM_LINES` 计算）、`rtl/core/branch_pred.v`（BTB 32 → **128**、RAS 4 → **16**）、`sw/bsp/ld/default.lds`（RAM 区改 256 KB、栈尺寸放大）、`sim/tb/cpu_test.v`（`+DRAM` 预加载先把 4 个 64 KiB bank 全部清零再覆盖 `.data` 镜像，否则 X 会扩散到 `sb / sh / sw` ISA 测试）。
+- **动机**：Tier A 引入 D-Cache 后，整体核已逼近"较大规模 MCU"形态，Artix-7 200T 留出的 BRAM/DSP/LUT 余量足以再拉一档容量与性能。先把 RAM 与 BPU/I-Cache 一起放大，给后续 MIG / DDR / 复杂 BSP 留一致 footprint。ROM 暂未扩，主要是 i_rom 仿真桩与 Vivado BRAM Generator 配置耦合，避免一次改动跨 RTL/仿真/上板三处。
+- **处理要点**：
+  - **RAM 64 KiB / bank**：`MemNum=65536`、`MemAddrBus=16`；为 iverilog 解释执行做一次小优化，把 `always @(*)` 改成 `always @(addr_o or re_i or rst)` 显式列出敏感量，否则 64 KiB 数组 + 通配敏感会让仿真 startup 阶段非常慢。
+  - **I-Cache 8 KB / 512 line**：`NUM_LINES` 参数化；`IDX_W` 由 `NUM_LINES` 计算（5..11 bit），后续可以一改参数把容量挤到 16 KB。
+  - **BPU 放大**：BTB 128 entry（按 `pc[8:2]` 索引）+ RAS 16 entry，配合 dhrystone 这种深递归调用栈，retire-pulse 与 misprediction 路径不变。
+  - **链接脚本**：RAM region 改成 `0x2000_0000..0x2003_FFFF`（256 KB），栈底自动随 region 顶部上移；ROM region 0x0xxx 不动。Dhrystone 与 `run_os_demo` 都依赖更大的栈，原 8 KB 栈在 `Dhrystone_Number_Of_Runs >= 5` 时已经会撞到 `.bss`。
+- **回归**（三条 fetch 路径 × DCACHE 开关 × benchmark）：
+  - 默认 I-Cache + D-Cache：`sim/run_isa.sh` 46/46 PASS（1 SKIP）、`sim/smoke.sh` PASS、`sim/run_dhrystone.sh` PASS；
+  - `-DTCM_IFETCH`：`sim/run_isa.sh` 46/46 PASS；
+  - `-DICACHE_DISABLE`：`sim/run_isa.sh` 46/46 PASS；
+  - `-DDCACHE_DISABLE`：`sim/run_isa.sh` 46/46 PASS；
+  - `scripts/lint.sh` 全绿。
+- **后续可选**：
+  - ROM 同步扩到 ≥128 KB（需要 i_rom 仿真桩与 Vivado BRAM Generator port A 字宽 / 地址位一起改）；
+  - 把 BHT 也从 32 entry 扩到 128 entry / gshare；
+  - 把 RAM 换成 MIG 的 AXI4-Lite facade（保留当前 256 KB BRAM 作 TCM，DDR 走另一条 cacheable 区段）。
 
 ---
 

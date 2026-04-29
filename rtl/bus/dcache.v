@@ -197,6 +197,35 @@ module dcache #(
     wire up_req       = up_d_bus_en & (up_ram_we | up_ram_re);
 
     // -------------------------------------------------------------------------
+    // Store buffer precision guard
+    // -------------------------------------------------------------------------
+    // The store buffer path can make write-back errors imprecise with
+    // respect to the CPU pipeline (see PROCESSOR_IMPROVEMENT_PLAN Tier A #3).
+    //
+    // For *non-cacheable stores*, we still want the SB fast path for common
+    // mapped MMIO targets (UART/CLINT/PLIC/etc). However, for store
+    // addresses that would trigger an access fault (unmapped) or a synthetic
+    // SLVERR (ROM is read-only), we must bypass the SB so DECERR/SLVERR
+    // reaches the CPU in the same cycle as d_bus_ready.
+    function automatic mapped_slave;
+        input [31:0] addr;
+        begin
+            mapped_slave = 1'b0;
+            if (addr[31:28] == 4'h0)        mapped_slave = 1'b1; // ROM
+            else if (addr[31:28] == 4'h2)   mapped_slave = 1'b1; // RAM
+            else if (addr[31:24] == 8'h40)  mapped_slave = 1'b1; // LED
+            else if (addr[31:24] == 8'h41)  mapped_slave = 1'b1; // KEY
+            else if (addr[31:24] == 8'h42)  mapped_slave = 1'b1; // CLINT
+            else if (addr[31:24] == 8'h43)  mapped_slave = 1'b1; // UART
+            else if (addr[31:24] == 8'h44)  mapped_slave = 1'b1; // PLIC
+        end
+    endfunction
+
+    wire up_in_rom          = (up_d_addr[31:28] == 4'h0);
+    wire up_mapped_slave   = mapped_slave(up_d_addr);
+    wire nc_store_fault    = up_ram_we & ~up_cacheable & (up_in_rom | ~up_mapped_slave);
+
+    // -------------------------------------------------------------------------
     // Hit logic (combinational over the IDLE state path)
     // -------------------------------------------------------------------------
     wire hit_match  = valid[up_idx] & (tag_mem[up_idx] == up_tag);
@@ -421,7 +450,7 @@ module dcache #(
     wire idle_hit          = (state == S_IDLE) & up_req & ~up_misalign
                            & up_cacheable & hit_match;
     wire idle_nc_store_ok  = (state == S_IDLE) & up_req & ~up_misalign
-                           & ~up_cacheable & up_ram_we & ~sb_full;
+                           & ~up_cacheable & up_ram_we & ~sb_full & ~nc_store_fault;
 
     // S_BYPASS ack pulse: high for exactly one clock cycle by virtue
     // of the FSM transitioning to S_IDLE on the next edge.
@@ -615,6 +644,19 @@ module dcache #(
                         sb_push_wstrb <= strb_for(up_mem_op,
                                                   up_boff);
                         sb_push_op    <= up_mem_op;
+                    end
+                    else if (up_req & ~up_misalign & ~up_cacheable & up_ram_we & nc_store_fault) begin
+                        // Non-cacheable store to an unmapped address (DECERR) or to
+                        // ROM (SLVERR). Bypass the store buffer to keep the exception
+                        // precise (d_bus_ready coincident with d_bus_err).
+                        miss_idx       <= up_idx;
+                        miss_tag       <= up_tag;
+                        miss_addr      <= up_d_addr;
+                        miss_op        <= up_mem_op;
+                        miss_was_load  <= 1'b0;
+                        miss_was_store <= 1'b1;
+                        miss_sdata     <= up_d_data_out;
+                        state          <= S_BYPASS;
                     end
                     else if (up_req & ~up_misalign & up_cacheable
                              & ~hit_match) begin

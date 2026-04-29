@@ -44,7 +44,7 @@ Memory Configuration
 
 Name             Origin             Length             Attributes
 rom              0x0000000000000000 0x0000000000010000 axrl !w
-ram              0x0000000020000000 0x0000000000020000 aw !xrl
+ram              0x0000000020000000 0x0000000000040000 aw !xrl
 *default*        0x0000000000000000 0xffffffffffffffff
 
 Linker script and memory map
@@ -56,7 +56,7 @@ LOAD /home/ycx/RISC-V-cpu/sw/programs/os_demo/build/bsp_trap.o
 LOAD /home/ycx/RISC-V-cpu/sw/programs/os_demo/build/bsp_uart.o
 LOAD /home/ycx/RISC-V-cpu/sw/programs/os_demo/build/bsp_start.o
 LOAD /home/ycx/RISC-V-cpu/sw/programs/os_demo/build/bsp_trap_entry.o
-                0x0000000000004000                PROVIDE (__stack_size = 0x4000)
+                0x0000000000008000                PROVIDE (__stack_size = 0x8000)
 
 .init           0x0000000000000000       0x68
  *(SORT_NONE(.init))
@@ -222,11 +222,11 @@ LOAD /home/ycx/RISC-V-cpu/sw/programs/os_demo/build/bsp_trap_entry.o
                 0x0000000020002160                PROVIDE (_end = .)
                 [!provide]                        PROVIDE (end = .)
 
-.stack          0x000000002001c000     0x4000
+.stack          0x0000000020038000     0x8000
                 [!provide]                        PROVIDE (__stack_bottom = .)
-                0x0000000020020000                . = (. + __stack_size)
- *fill*         0x000000002001c000     0x4000 
-                0x0000000020020000                PROVIDE (__stack_top = .)
+                0x0000000020040000                . = (. + __stack_size)
+ *fill*         0x0000000020038000     0x8000 
+                0x0000000020040000                PROVIDE (__stack_top = .)
                 [!provide]                        PROVIDE (__heap_start = _end)
                 [!provide]                        PROVIDE (__heap_end = __stack_bottom)
 

@@ -120,9 +120,42 @@
 - **资源估算（Artix-7 200T）**：tag SRAM 512 × 19 = 9.7 Kbit；data SRAM 512 × 128 bit = 64 Kbit（≈ 4 个 18-Kbit BRAM）；valid/dirty 1024 FF；FSM/比较 ~150 LUT。SB 4 × (32+32+4+3) = 284 bit ≈ 一个 distRAM；snoop 4 × 32-bit 比较器 + 字节合成 ~40 LUT。整体远小于 200T 余量。
 - **后续可选**：
   - 扩 16 KB 或换 2-way set associative（命中率 + 抗 thrashing）；
-  - line fill 加 critical-word-first（命中拍直接给关键字，剩 3 字后台填）；
   - dirty bit 改 per-word 而非 per-line（write-back 流量进一步减少）；
-  - 把 ROM 域也加入 cacheable（需配套加「ROM 永远不 dirty」断言，避免错误 evict）。
+  - 把 ROM 域也加入 cacheable（需配套加「ROM 永远不 dirty」断言，避免错误 evict）；
+  - 进一步实现 hit-under-miss（在 line fill 期间允许命中已经填好的字），需要让 hit 路径同时窥探 `fill_buf`，目前只做了 critical-word-first，对同 line 的后续字仍 stall 到 commit。
+
+### 9.x · 总线组合握手 + I/D-Cache critical-word-first ✅
+
+- **位置**：`rtl/bus/axil_master_bridge.v`（4 态 → 3 态 FSM，`m_arvalid / m_awvalid / m_wvalid / d_bus_ready / d_bus_err / d_bus_misalign / bus_data_in` 全部组合化）、`rtl/bus/dcache.v`（删除 `S_FILL_ACK`，`fill_cnt` 起始为 `miss_addr[3:2]`，用 `beats_rcv` 计数 + 显式 `fill_pending`）、`rtl/bus/icache.v`（CWF：`beats_rcv==0` 标定首拍 deliver，`fetch_target_match` 防 PC 重定向错配）。
+- **动机**：Tier 4.2 末尾遗留的两条 follow-up：
+  1. `axil_master_bridge` 原 `S_IDLE → S_R/S_W → S_DONE → S_IDLE` 4 态 FSM 让每一笔 load/store 都至少多 1 拍 latency（`S_DONE` parking 拍 + `S_IDLE → S_R/S_W` 注册 AR/AW）；
+  2. I-Cache / D-Cache 都「填满整条 line 才 ack CPU」，关键字真正被消费的是第一拍 beat，剩下三拍其实可以后台填，CPU 没必要陪着等。
+- **处理（`axil_master_bridge`）**：
+  - **FSM 塌成 3 态**：`S_IDLE → S_R / S_W`，response 通道（`B / R`）回来那拍组合输出 `d_bus_ready / d_bus_err / d_bus_misalign / bus_data_in`，bridge 与 CPU 在同一时钟沿上做下一拍的状态推进。S_DONE parking 拍删掉是安全的——旧版 S_DONE 的存在是为了避免「CPU 还没消费 ack 就被同拍重发同一笔事务」，组合 ack 把 ack 和 reg_3 advance 合并到同一沿后这条隐患天然消失（reg_3 在 ack 那拍就已经 advance，下一拍 `d_bus_en` 反映的是新指令）。
+  - **AR / AW / W / wstrb / wdata 全部组合**：`m_arvalid = idle_r_issue`、`m_awvalid = m_wvalid = idle_w_issue`，`m_araddr / m_awaddr` 直接来自 `d_addr` 的高 30 位拼对齐位；`m_wstrb / m_wdata` 由 `mem_op + d_addr[1:0] + d_data_out` 组合算。`addr_latch / op_latch` 仍按 AR/AW fire 那拍寄存，留给 R 通道字节抽取做 base，避免把 `d_addr → m_araddr → interconnect → m_rdata → bus_data_in` 全部串成一条组合长链。
+  - **未对齐 short-circuit 也组合**：`idle_misalign`（CPU 发 misaligned load/store）那拍直接拉 `d_bus_ready=1, d_bus_misalign=1`，state 留在 S_IDLE 不变，AXI 总线上不发任何事务；与 Tier A #2 的语义一致，但少一个 parking 拍。
+- **处理（D-Cache CWF）**：
+  - **FSM 删 `S_FILL_ACK`**：进入 `S_FILL` 时 `fill_cnt <= miss_addr[3:2]`（关键字偏移），`beats_rcv` 计数到 3 时直接转回 S_IDLE 并 commit 新 line。首拍 CWF 用 **`beats_rcv==0 & dn_d_bus_ready`** 限定 `up_d_bus_ready` 只 pulse 一次（无需额外 `fill_first_done` 寄存器）。
+  - **CWF deliver 路径**：第一拍 beat 到达时（`fill_first_beat = fill_pending & dn_d_bus_ready & (beats_rcv==0)`）组合驱动 `up_d_bus_ready=1` 并 `up_bus_data_in = extract_load(dn_bus_data_in, ...)`——直接用 AXI R 通道送上来的字而不是 fill_buf 里寄存版本，省一拍。
+  - **背景填 + 显式 fill_pending**：`assign fill_pending = (state==S_FILL)`；第一拍 beat ack 之后 CPU 会推进 reg_3 并可能立刻发出新的 load/store；此时 D-Cache 状态仍是 `S_FILL`，所有 `idle_*` 通道（hit / NC store / misalign）都被 `state == S_IDLE` 锁住，新请求会自然 stall，等当前 line commit 后 (state→S_IDLE) 再服务。Hit-under-miss / 同 line 不同字 deliver 留作 follow-up。
+- **处理（I-Cache CWF）**：
+  - 同样把 `fill_cnt <= up_wsel` 作为起始 beat 偏移，用 `beats_rcv` 计数到 3 表示整行收齐；首拍用 **`fill_critical_beat = (state==S_FILL) & dn_ready & (beats_rcv==0)`**。
+  - `fill_deliver = fill_critical_beat & fetch_target_match`：`fetch_target_match` 即 `up_idx/up_tag/up_wsel` 与 miss 时锁存的 `fill_*` 一致，防 stale-fill（trap / pending redirect 改了 PC 时不能把旧 line 的字塞给新 PC）。
+  - 第一拍 beat 之后 CPU 的 reg_1 已经拿到关键字、`pc_addr` 一拍内可能 advance；icache 继续在背景接收剩下三拍并最终在 `beats_rcv==3` 那拍 commit `tag_mem / valid / data_mem`。背景填期间任何 lookup 都因 `state != S_IDLE` 而 miss → stall（hit-under-miss 同样列为 follow-up）。
+- **回归**：
+  - `sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`），同步在 `-DTCM_IFETCH` / `-DICACHE_DISABLE` / `-DDCACHE_DISABLE` / `-DICACHE_DISABLE -DDCACHE_DISABLE` 四个编译开关下都 46/46；
+  - `sim/smoke.sh`、`sim/bus_bench.sh`、`sim/bpu_bench.sh` 全绿；`sim/smoke_mi.sh` 与基线状态等价（基线已知 Test 10 imprecise SB 路径未消费 DECERR，是 Tier 9 D-Cache 文档中已记录的 known limitation，本次改动不引入新失败）；
+  - `sim/run_dhrystone.sh` 端到端：mcycle `2534 → 2381`、cycles/Dhrystone `506 → 476`、IPC `0.574 → 0.611`、DMIPS/MHz `1.124 → 1.195`（**+6.3%**）；
+  - `sim/bus_bench.sh` ROM `.rodata` lw（NC bypass 路径）`9.00 → 7.00 cyc/iter`（**−22.2%**），RAM 命中路径不变（cache hit 主导，组合 bridge 只在 miss / NC / writeback 路径出现）。
+- **时序注意点**：组合化后新增了三条值得在 P&R 上盯一下的路径：
+  1. `d_addr → m_araddr / m_awaddr → interconnect → s_*ready` —— 主桥到从桥决策的 AR/AW 路径变长；
+  2. `m_rvalid → bridge.d_bus_ready → dcache → cpu.hazard_ctrl.d_wait` —— bypass / fill-first-beat 那拍的 ack 反馈链路；
+  3. `m_rdata → bridge.bus_data_in → dcache → mem_ctrl.j2_p_out → reg_4_in` —— 关键字数据通路。
+  Artix-7 100T / 200T 当前频率档位下 iverilog/Verilator 仿真均无问题；如果未来在更高 fmax 上踩到 setup violation，可以**只**把 `m_arvalid / m_awvalid / m_wvalid` 退化回 1 拍寄存（保留 `S_DONE` 删除带来的 1 拍收益），这是 PROCESSOR_IMPROVEMENT_PLAN 之前明确给出的 fmax 退路。
+- **后续可选**：
+  - I-Cache / D-Cache 加 hit-under-miss：在 fill_buf 上挂一个 partial-line snoop，让对同一 line 已落地字的 hit 不再 stall 到 line commit；
+  - 把 D-Cache 的 NC store 也用组合 bridge 直接 ack（目前仍走 SB，多一拍 SB push），能再压一拍 MMIO 写延迟；
+  - 把 4-beat 单笔 AR 升级为 AXI4 burst（INCR len=4），上游接 MIG 时一次 burst 就能把整条 line 拉回。
 
 ### 10. 流水线模块化 ✅
 
@@ -200,8 +233,8 @@
   折算到总线延迟本身：RAM load-to-use 从 4 拍压到 3 拍（slave_wrapper 省 1 拍），`.rodata` load-to-use 从 ~11 拍压到 5 拍（rodata FSM 从 7 拍 → 3 拍 + wrapper 少 1 拍）。
 - **回归**：`sim/run_isa.sh` 46/46 PASS（1 SKIP `fence_i`），`sim/smoke_mi.sh` / `sim/smoke.sh` / `scripts/lint.sh` 全绿；无新 xfail。新加回归工具 `sim/bus_bench.sh` + `sim/tests/bus_bench.S` 以便后续做总线层面的 A/B。
 - **后续可选（Tier 4 第 3–6 项的后续踏板）**：
-  - 把 `axil_master_bridge` 的 `S_IDLE → S_R/S_W` 转换也组合化（m_arvalid 在 IDLE 直接跟随 `d_bus_en`），理论上再能省 1 拍 RAM load-to-use，但会拉长 `d_addr → m_araddr → interconnect → s_araddr → s_arready → m_arready` 的组合路径，权衡上留给接入 DDR / I-Cache 时一并处理；
-  - 引入 1 拍 Store Buffer（CPU 写完立刻 retire，写后 load 靠 bypass），可把 sw 的 6 拍/iter 降到接近 3 拍/iter；
+  - ~~把 `axil_master_bridge` 的 `S_IDLE → S_R/S_W` 转换也组合化（m_arvalid 在 IDLE 直接跟随 `d_bus_en`）~~ → 已在 [Tier 9.x 总线组合握手 + I/D-Cache critical-word-first](#9x--总线组合握手--idcache-critical-word-first-) 完成，把 4 态 FSM 塌成 3 态 + 删 `S_DONE`，配合 D-Cache CWF 让 Dhrystone IPC 0.574 → 0.611、ROM `.rodata` 9 → 7 cyc/iter；
+  - 引入 1 拍 Store Buffer（CPU 写完立刻 retire，写后 load 靠 bypass），可把 sw 的 6 拍/iter 降到接近 3 拍/iter（已在 Tier 9 D-Cache + SB 中完成）；
   - 挂 Xilinx `axi_uart16550` / `axi_qspi` / `axi_dma` 做真实 AXI 负载；
   - 接 MIG 的 AXI4-Lite facade 以替换当前内建 BRAM 的 RAM 窗口；
   - 补一个 AXI4-Lite ↔ APB 桥，方便挂低速 APB IP。
@@ -295,7 +328,7 @@
 
 - **设计**：
   - **I-Cache 拓扑**：2 KB direct-mapped、16-byte line（4 × 32 bit word），128 line、`index=addr[10:4]`、`tag=addr[31:11]`、`word_off=addr[3:2]`。Line 数据 SRAM (`lines[index][word_off]`) 与 tag/valid SRAM 分两路，lookup 完全组合回 `i_bus_ready`（命中下 CPU 侧 0 拍等待，复刻 TCM 行为）。
-  - **Miss FSM**：2 状态 `S_IDLE → S_FILL`。进 `S_FILL` 时锁 `fill_addr_r={miss_tag, miss_index, 4'b0000}`，按 `word_off=0..3` 串行发 4 次对齐 AR；每收到一个 R beat 就把数据写进 `lines[fill_index][beat_cnt]`；beat_cnt=3 收到后同拍拉 `valid_r[fill_index]=1` 并给 CPU `i_bus_ready=1`（critical-word-first 的变体——先填 index-0 是简化，后续可以优化为命中拍优先）。
+  - **Miss FSM**：2 状态 `S_IDLE → S_FILL`。进 `S_FILL` 时锁 `fill_addr_r={miss_tag, miss_index, 4'b0000}`，按 `word_off=0..3` 串行发 4 次对齐 AR；每收到一个 R beat 就把数据写进 `lines[fill_index][beat_cnt]`；beat_cnt=3 收到后同拍拉 `valid_r[fill_index]=1` 并给 CPU `i_bus_ready=1`。**升级为 critical-word-first（Tier 9.x）**：`fill_cnt` 起始改成 `up_wsel`，第一拍 beat 即组合返回 `i_bus_ready=1` + 关键字数据，剩下 3 拍后台 wrap 填线，命中拍延迟从「填完 4 拍才 ack」缩到「关键字拍即 ack」。
   - **Stale-fill 防护**：CPU 在 miss fill 过程中如果因为 trap / pending redirect / mispredict 改了 `up_addr`，填完的数据与当前 `up_addr` 不一定匹配。`icache.v` 加 `fill_addr_match = ({up_addr[31:4]} == fill_addr_r[31:4])` 门控 `i_bus_ready` 与数据 mux；不匹配时 CPU 视为继续 miss，等待下一次 lookup（此时下一次可能 hit，因为 valid_r 已经写入了对应 line）。
   - **`fence.i`**：`id.v` 已有 `is_fence_i` 解码；`cpu_jh.v` 在 fence.i 即将进入 `reg_1` 的同拍（`reg1_en & incoming_is_fence_i`）一次性脉冲 `flush_icache`，`icache.v` 把 `valid_r` 整张清零。选择同拍而非下一拍，是因为下一拍 lookup 的组合路径已经在采 valid 位——晚一拍会漏掉「fence.i 的后继 PC 命中旧 line」的窗口。
 - **处理**：

@@ -66,10 +66,31 @@
 //     write-then-read of the same physical line we just evicted.
 //
 // In a hit-after-miss steady state this overlaps SB drain with CPU
-// progress: the miss completes, S_FILL_ACK retires the load, and the SB
-// continues draining the 4 evicted words while the CPU runs ahead on
-// cache hits.  Two misses in a row serialise (the second waits for SB
-// to empty before evicting), so the SB never overflows.
+// progress: the miss returns the critical word on the very first beat,
+// the CPU resumes mid-fill while the remaining three words finish
+// streaming into the data SRAM, and the SB continues draining the 4
+// evicted words while the CPU runs ahead on cache hits.  Two misses
+// in a row serialise (the second waits for the first to commit and
+// the SB to empty before evicting), so the SB never overflows.
+//
+// Critical-word-first
+// -------------------
+// PROCESSOR_IMPROVEMENT_PLAN.md Tier 4.2 follow-up: instead of waiting
+// for all four beats to land before acking the CPU, we kick off the
+// line fill at `fill_cnt = miss_addr[3:2]` and pulse `up_d_bus_ready`
+// the cycle that very first beat returns.  The CPU samples the
+// requested word combinationally from the AXI R channel and resumes
+// on the next clock edge, while S_FILL stays put draining the
+// remaining three beats into `fill_buf` (still wrapping `fill_cnt`
+// modulo 4 so each beat lands in its correct line slot).  Once the
+// fourth beat lands the line is committed and we drop back to S_IDLE
+// in the same cycle - there is no separate S_FILL_ACK any more.  CPU
+// requests that arrive during the background-fill window see
+// state != S_IDLE and stall on `up_d_bus_ready=0` until the line is
+// committed; that's the simplest "fill_pending" semantics and is
+// strictly correct because we cannot service a partial-line lookup
+// without snooping fill_buf.  Hit-under-miss is left as a future
+// optimisation.
 //
 // `flush` is a 1-cycle pulse that asks the cache to drop ALL valid /
 // dirty bits.  It does NOT scrub dirty lines back to memory: dirty
@@ -344,16 +365,21 @@ module dcache #(
 
     // -------------------------------------------------------------------------
     // FSM
+    //
+    // Note: S_FILL_ACK is gone vs the pre-CWF revision -- the critical
+    // word ack is now delivered combinationally on the first beat of
+    // S_FILL (see `fill_first_beat` below), and the line commit happens
+    // directly on the last beat with state going straight to S_IDLE.
     // -------------------------------------------------------------------------
     localparam [2:0] S_IDLE      = 3'd0;
     localparam [2:0] S_WB_PUSH   = 3'd1;
     localparam [2:0] S_FILL_WAIT = 3'd2;
     localparam [2:0] S_FILL      = 3'd3;
-    localparam [2:0] S_FILL_ACK  = 3'd4;
-    localparam [2:0] S_BYPASS    = 3'd5;
+    localparam [2:0] S_BYPASS    = 3'd4;
 
     reg [2:0]            state;
-    reg [WSEL_W-1:0]     fill_cnt;
+    reg [WSEL_W-1:0]     fill_cnt;       // current beat's word slot (CWF: starts at miss_addr[3:2], wraps mod 4)
+    reg [WSEL_W-1:0]     beats_rcv;      // number of beats received so far in this fill (0..3); 0 => next R is critical beat
     reg [WSEL_W-1:0]     wb_cnt;
     reg [IDX_W-1:0]      miss_idx;
     reg [TAG_W-1:0]      miss_tag;
@@ -397,11 +423,20 @@ module dcache #(
     wire idle_nc_store_ok  = (state == S_IDLE) & up_req & ~up_misalign
                            & ~up_cacheable & up_ram_we & ~sb_full;
 
-    // S_BYPASS / S_FILL_ACK ack pulses.  Each becomes high for exactly
-    // one clock cycle by virtue of the FSM transitioning to S_IDLE on
-    // the next edge.
-    wire bypass_ack    = (state == S_BYPASS) & dn_d_bus_ready;
-    wire fill_ack_now  = (state == S_FILL_ACK);
+    // S_BYPASS ack pulse: high for exactly one clock cycle by virtue
+    // of the FSM transitioning to S_IDLE on the next edge.
+    wire bypass_ack = (state == S_BYPASS) & dn_d_bus_ready;
+
+    // Explicit background-fill semantics (PROCESSOR_IMPROVEMENT_PLAN):
+    // While fill_pending is set, upstream hit / NC-store / bypass paths do
+    // not arm (state!=S_IDLE), so accesses to other words on the same line
+    // stall until commit — no hit-under-fill.
+    wire fill_pending = (state == S_FILL);
+
+    // Critical-word-first ack pulse: same cycle as the FIRST returning beat
+    // (beats_rcv==0) after fill_cnt was initialised to miss_addr[3:2].
+    wire fill_first_beat = fill_pending & dn_d_bus_ready
+                         & (beats_rcv == {WSEL_W{1'b0}});
 
     // -------------------------------------------------------------------------
     // CPU-visible ready / data / err / misalign (combinational).
@@ -434,14 +469,19 @@ module dcache #(
         else if (idle_nc_store_ok) begin
             up_d_bus_ready = 1'b1;
         end
-        else if (fill_ack_now) begin
+        else if (fill_first_beat) begin
+            // CWF ack: the very first fill beat IS the critical word
+            // because we initialise fill_cnt = miss_addr[3:2].  Drive
+            // the load result combinationally from the AXI R channel
+            // (`dn_bus_data_in`) so the CPU sees its word the same
+            // cycle the AXI bus delivers it; no detour through
+            // fill_buf or the data SRAM.
             up_d_bus_ready = 1'b1;
-            up_d_bus_err   = fill_err;
+            up_d_bus_err   = dn_d_bus_err;
             if (miss_was_load) begin
-                up_bus_data_in = extract_load(
-                                    fill_buf[32*miss_addr[3:2] +: 32],
-                                    miss_op,
-                                    miss_addr[1:0]);
+                up_bus_data_in = extract_load(dn_bus_data_in,
+                                              miss_op,
+                                              miss_addr[1:0]);
             end
         end
         else if (bypass_ack) begin
@@ -508,6 +548,7 @@ module dcache #(
         if (!aresetn) begin
             state           <= S_IDLE;
             fill_cnt        <= {WSEL_W{1'b0}};
+            beats_rcv       <= {WSEL_W{1'b0}};
             wb_cnt          <= {WSEL_W{1'b0}};
             miss_idx        <= {IDX_W{1'b0}};
             miss_tag        <= {TAG_W{1'b0}};
@@ -588,9 +629,15 @@ module dcache #(
                             miss_was_load  <= up_ram_re;
                             miss_was_store <= up_ram_we;
                             miss_sdata     <= up_d_data_out;
-                            fill_cnt       <= {WSEL_W{1'b0}};
-                            fill_buf       <= {LINE_BITS{1'b0}};
-                            fill_err       <= 1'b0;
+                            // CWF: start the line read at the word the
+                            // CPU is actually waiting on.  fill_cnt
+                            // wraps modulo 4 each beat and beats_rcv
+                            // tracks how many of the four beats have
+                            // landed so we know when to commit.
+                            fill_cnt        <= up_wsel;
+                            beats_rcv       <= {WSEL_W{1'b0}};
+                            fill_buf        <= {LINE_BITS{1'b0}};
+                            fill_err        <= 1'b0;
                             if (victim_dirty) begin
                                 evict_buf <= data_mem[up_idx];
                                 evict_tag <= tag_mem[up_idx];
@@ -655,15 +702,33 @@ module dcache #(
                 end
 
                 // ------------------------------------------------------
-                // S_FILL: 4-beat line read.  On the last beat commit the
-                // line and proceed to S_FILL_ACK.
+                // S_FILL: 4-beat line read with critical-word-first.
+                //
+                // Beat 0 (when beats_rcv==0) carries the critical word
+                // because fill_cnt was initialised to miss_addr[3:2].
+                // The combinational up_d_bus_ready path above pulses
+                // ack THIS cycle so the CPU resumes immediately.
+                // `beats_rcv==0` ensures that pulse is exactly once per
+                // fill (subsequent beats have beats_rcv!=0). Subsequent
+                // beats stream in with their own
+                // dn_d_bus_ready handshakes, fill_cnt wraps mod 4 so
+                // each word lands in its correct slot, and beats_rcv
+                // increments to track when we have all four.
+                //
+                // Last beat (beats_rcv==3) commits the line and goes
+                // straight to S_IDLE -- the old S_FILL_ACK parking
+                // cycle is gone because the CWF ack has already
+                // happened.  Any new CPU request that arrives between
+                // the CWF ack and the line commit stalls on
+                // up_d_bus_ready=0 (state != S_IDLE blocks every
+                // idle_*).
                 // ------------------------------------------------------
                 S_FILL: begin
                     if (dn_d_bus_ready) begin
                         fill_buf <= fill_buf_next;
                         if (dn_d_bus_err) fill_err <= 1'b1;
 
-                        if (fill_cnt == {WSEL_W{1'b1}}) begin
+                        if (beats_rcv == {WSEL_W{1'b1}}) begin
                             // Build the post-fill, post-merge line in
                             // one combinational shot.
                             commit_line = fill_buf_next;
@@ -687,19 +752,14 @@ module dcache #(
                                 valid[miss_idx]    <= 1'b1;
                                 dirty[miss_idx]    <= miss_was_store;
                             end
-                            state <= S_FILL_ACK;
+                            state <= S_IDLE;
                         end else begin
-                            fill_cnt <= fill_cnt + 1'b1;
+                            // 2-bit fill_cnt naturally wraps mod 4, no
+                            // explicit modular logic needed.
+                            fill_cnt  <= fill_cnt  + 1'b1;
+                            beats_rcv <= beats_rcv + 1'b1;
                         end
                     end
-                end
-
-                // ------------------------------------------------------
-                // S_FILL_ACK: combinational up_d_bus_ready=1 (above);
-                // we just transition back to S_IDLE.
-                // ------------------------------------------------------
-                S_FILL_ACK: begin
-                    state <= S_IDLE;
                 end
 
                 // ------------------------------------------------------
@@ -727,12 +787,12 @@ module dcache #(
 `ifdef DCACHE_TRACE
     always @(posedge aclk) begin
         if (aresetn) begin
-            if (idle_nc_store_ok || bypass_ack || fill_ack_now ||
+            if (idle_nc_store_ok || bypass_ack || fill_first_beat ||
                 (sb_drain_active && dn_d_bus_ready)) begin
-                $display("[dcache] t=%0t st=%0d up_addr=%h up_we=%b up_re=%b up_data=%h up_din=%h dn_addr=%h dn_we=%b dn_din=%h dn_rdy=%b nc_st=%b bypass=%b fill_ack=%b sb_dr=%b head_a=%h head_d=%h",
+                $display("[dcache] t=%0t st=%0d up_addr=%h up_we=%b up_re=%b up_data=%h up_din=%h dn_addr=%h dn_we=%b dn_din=%h dn_rdy=%b nc_st=%b bypass=%b cwf_ack=%b sb_dr=%b head_a=%h head_d=%h",
                     $time, state, up_d_addr, up_ram_we, up_ram_re, up_d_data_out, up_bus_data_in,
                     dn_d_addr, dn_ram_we, dn_bus_data_in, dn_d_bus_ready,
-                    idle_nc_store_ok, bypass_ack, fill_ack_now, sb_drain_active,
+                    idle_nc_store_ok, bypass_ack, fill_first_beat, sb_drain_active,
                     sb_head_addr, sb_head_wdata);
             end
         end

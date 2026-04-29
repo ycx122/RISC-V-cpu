@@ -35,17 +35,24 @@
 //   a sequential sustained stream can push 1 fetch / cycle the way the
 //   TCM_IFETCH fallback used to.
 //
-// * Miss path: 4-beat line fill.  On a miss we park in S_FILL for four
-//   round trips through axil_ifetch_bridge (each round is AR + R =
-//   2 cycles minimum), latching each word into `fill_buf` and then
-//   committing tag / valid / data at the edge the 4th beat completes.
-//   Subsequent lookups to the same line hit the newly-committed entry on
-//   the very next cycle.
+// * Miss path: 4-beat line fill with critical-word-first.  On a miss we
+//   park in S_FILL for four round trips through axil_ifetch_bridge (each
+//   round is AR + R = 2 cycles minimum after the bridge collapsed its
+//   parking state, see PROCESSOR_IMPROVEMENT_PLAN Tier 4.2 follow-up).
+//   `fill_cnt` is initialised to `up_wsel`, so the very first beat
+//   carries the word the CPU is actually waiting on; we drive that word
+//   straight back to the CPU on the same cycle the AXI R channel
+//   delivers it (see `fill_first_beat` below) and then continue to
+//   stream the remaining three words into `fill_buf` in wrap-around
+//   order.  At the edge the fourth beat completes we commit tag / valid
+//   / data and return to S_IDLE.  Subsequent lookups to the same line
+//   hit the newly-committed entry on the very next cycle.
 //
-//   Fill order is always ascending from word 0 of the line, not
-//   critical-word-first.  The simple order keeps the logic small and the
-//   access pattern pleasantly predictable for future MIG-style bursts;
-//   CWF is revisited if the bridge later supports an AXI burst mode.
+//   While the background fill is in flight the lookup port stays
+//   stalled (state != S_IDLE blocks the comb hit path), which matches
+//   the dcache "fill_pending" semantics.  Hit-under-miss out of the
+//   partial fill_buf is left as a future optimisation; CWF alone
+//   already removes most of the miss-to-use latency.
 //
 // * fence.i support.  `flush` is a 1-cycle pulse driven by cpu_jh.v
 //   when a fence.i instruction first appears in reg_1.  On the flush
@@ -151,8 +158,14 @@ module icache #(
     localparam S_FILL = 1'b1;
     reg state;
 
-    // In-flight fill state
+    // In-flight fill state.  `fill_cnt` tracks the word slot the next
+    // R beat will land in; it starts at the critical word offset
+    // (`up_wsel` at miss entry) and wraps modulo 4.  `beats_rcv`
+    // counts how many beats have actually returned so we know when
+    // the four-beat fill is done -- using `fill_cnt == 3` as a
+    // termination check is no longer correct under CWF.
     reg [WSEL_W-1:0]  fill_cnt;
+    reg [WSEL_W-1:0]  beats_rcv;
     reg [IDX_W-1:0]   fill_idx;
     reg [TAG_W-1:0]   fill_tag;
     reg [WSEL_W-1:0]  fill_wsel;          // the word the CPU is actually asking for
@@ -173,11 +186,13 @@ module icache #(
     wire [31:0]         hit_line_word   = hit_line[32*up_wsel +: 32];
 
     // ---------------- Combinational fill-complete outputs ---------------------
-    // The cycle the 4th beat returns we commit synchronously at the edge AND
-    // answer the CPU combinationally in the same cycle, so reg_1 can latch
-    // on the same edge that writes data_mem.  This saves one cycle vs.
-    // falling back to a hit on the newly-written entry next cycle.
-    wire fill_last_beat = (state == S_FILL) & dn_ready & (fill_cnt == {WSEL_W{1'b1}});
+    // CWF: first AXI beat (beats_rcv==0) returns the critical word because
+    // fill_cnt starts at up_wsel.  Deliver combinationally only when the
+    // current fetch address still matches the miss we started — otherwise a
+    // PC redirect would tag the wrong insn onto the new pc_addr.
+    wire fill_critical_beat = (state == S_FILL) & dn_ready
+                            & (beats_rcv == {WSEL_W{1'b0}});
+    wire fill_last_beat  = (state == S_FILL) & dn_ready & (beats_rcv == {WSEL_W{1'b1}});
 
     // Next-state fill_buf, with the just-arrived beat merged in.  Writing it
     // out as a mask avoids relying on a variable-width bit-select assignment
@@ -193,8 +208,9 @@ module icache #(
         endcase
     end
 
-    // Word the CPU is actually waiting on, extracted out of the merged buffer.
-    wire [31:0] fill_cpu_word = fill_buf_next[32*fill_wsel +: 32];
+    // Word returned on the current fill beat (only sampled when
+    // state==S_FILL; first beat is the critical word).
+    wire [31:0] fill_cpu_word = dn_data;
 
     // ---------------- Downstream drive ----------------------------------------
     // During S_FILL we continuously hold dn_en + dn_addr aimed at the next
@@ -211,29 +227,32 @@ module icache #(
     // ---------------- Upstream outputs ----------------------------------------
     // up_ready pulses on:
     //   * a pure cache hit (state == S_IDLE), OR
-    //   * the completing fill cycle for the line the CPU is waiting on
-    //     (deliver the critical word in the same cycle we commit the line).
+    //   * the cycle the FIRST beat of a fill returns - that beat is
+    //     the critical word because fill_cnt was initialised to
+    //     up_wsel.  This delivers the requested instruction the
+    //     instant the AXI R channel produces it, ahead of the rest of
+    //     the line being committed.
     //
     // If the CPU's pc redirects during a fill (trap / misprediction /
-    // pending-redirect), the in-flight fill is allowed to finish for its
-    // original line, but the critical-word combinational drive back to the
-    // CPU must NOT fire when up_addr no longer maps onto this fill: doing
-    // so would hand the CPU a word from the WRONG line tagged with the NEW
-    // PC (up_data latched alongside pc_addr_reg0=new PC), and that stray
-    // instruction would then execute in the shadow of the trap handler.
-    // The fill-completes-into-cache commit still happens unconditionally,
-    // so a later fetch that comes back to the same line hits normally.
-    wire fill_addr_match = (up_addr[IDX_LSB +: IDX_W]  == fill_idx)
-                         & (up_addr[TAG_LSB +: TAG_W]  == fill_tag)
-                         & (up_addr[WSEL_LSB +: WSEL_W] == fill_wsel);
-    wire fill_deliver    = fill_last_beat & fill_addr_match;
+    // pending-redirect), the in-flight fill is allowed to finish for
+    // its original line, but the critical-word combinational drive
+    // back to the CPU must NOT fire when up_addr no longer maps onto
+    // this fill: doing so would hand the CPU a word from the WRONG
+    // line tagged with the NEW PC (up_data latched alongside
+    // pc_addr_reg0=new PC), and that stray instruction would then
+    // execute in the shadow of the trap handler.  The fill-completes-
+    // into-cache commit still happens unconditionally, so a later
+    // fetch that comes back to the same line hits normally.
+    wire fetch_target_match = (up_idx == fill_idx) & (up_tag == fill_tag)
+                            & (up_wsel == fill_wsel);
+    wire fill_deliver    = fill_critical_beat & fetch_target_match;
     assign up_ready = hit | fill_deliver;
     assign up_data  = (state == S_FILL) ? fill_cpu_word : hit_line_word;
 
     // up_err is pulsed together with the fill-completion up_ready when any
     // beat of the fill returned SLVERR / DECERR.  A hit can never carry an
     // error because we refuse to commit a faulted line.
-    assign up_err   = fill_deliver & (fill_err | dn_err);
+    assign up_err   = fill_deliver & dn_err;
 
     // ---------------- Sequential ----------------------------------------------
     // NOTE: tag_mem / data_mem are deliberately NOT cleared on reset.  Both
@@ -249,6 +268,7 @@ module icache #(
             state           <= S_IDLE;
             valid           <= {NUM_LINES{1'b0}};
             fill_cnt        <= {WSEL_W{1'b0}};
+            beats_rcv       <= {WSEL_W{1'b0}};
             fill_idx        <= {IDX_W{1'b0}};
             fill_tag        <= {TAG_W{1'b0}};
             fill_wsel       <= {WSEL_W{1'b0}};
@@ -269,13 +289,18 @@ module icache #(
                     fill_flush_seen <= 1'b0;
 
                     if (up_en & ~hit_idle & ~flush) begin
-                        state          <= S_FILL;
-                        fill_cnt       <= {WSEL_W{1'b0}};
-                        fill_idx       <= up_idx;
-                        fill_tag       <= up_tag;
-                        fill_wsel      <= up_wsel;
-                        fill_buf       <= {LINE_BITS{1'b0}};
-                        fill_err       <= 1'b0;
+                        state           <= S_FILL;
+                        // CWF: start at the word the CPU is waiting
+                        // on so the first beat is the critical word.
+                        // beats_rcv counts up to 3 to detect line
+                        // completion since fill_cnt now wraps.
+                        fill_cnt        <= up_wsel;
+                        beats_rcv       <= {WSEL_W{1'b0}};
+                        fill_idx        <= up_idx;
+                        fill_tag        <= up_tag;
+                        fill_wsel       <= up_wsel;
+                        fill_buf        <= {LINE_BITS{1'b0}};
+                        fill_err        <= 1'b0;
                     end
                 end
 
@@ -284,7 +309,7 @@ module icache #(
                         fill_buf <= fill_buf_next;
                         if (dn_err) fill_err <= 1'b1;
 
-                        if (fill_cnt == {WSEL_W{1'b1}}) begin
+                        if (beats_rcv == {WSEL_W{1'b1}}) begin
                             // Last beat.  Commit the line iff (a) no beat
                             // returned an error and (b) no flush fired
                             // during the fill window.  Otherwise the line
@@ -297,7 +322,9 @@ module icache #(
                             end
                             state <= S_IDLE;
                         end else begin
-                            fill_cnt <= fill_cnt + {{(WSEL_W-1){1'b0}}, 1'b1};
+                            // 2-bit fill_cnt naturally wraps mod 4.
+                            fill_cnt  <= fill_cnt  + {{(WSEL_W-1){1'b0}}, 1'b1};
+                            beats_rcv <= beats_rcv + {{(WSEL_W-1){1'b0}}, 1'b1};
                         end
                     end
                 end

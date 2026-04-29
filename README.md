@@ -17,24 +17,24 @@
 
 | 指标 | 数值 |
 | --- | --- |
-| 总 `mcycle` | 2534 |
+| 总 `mcycle` | 2381 |
 | 总 `minstret` | 1455 |
-| **Cycles / Dhrystone** | **506** |
+| **Cycles / Dhrystone** | **476** |
 | Instret / Dhrystone | 291 |
-| **IPC** | **0.574** |
-| **DMIPS/MHz** | **1.124** |
+| **IPC** | **0.611** |
+| **DMIPS/MHz** | **1.195** |
 
 测量方式：`sw/tinyriscv/tests/example/dhyrstone/dhry_stubs.c` 的 `csr_cycle()` / `csr_instret()` 直接通过 `csrr` 读取架构 CSR `mcycle` / `mcycleh` 与 `minstret` / `minstreth`（用读 hi → 读 lo → 再读 hi 的标准防撕裂序列），与 SoC 上 CLINT `mtime` 的 MMIO 时基解耦。复现：
 
 ```bash
 bash sim/run_dhrystone.sh
 # 关键输出：
-#   (*) Cycles per Dhrystone:  506
-#   (*) IPC (minstret/mcycle): 0.574
-#         1000000/(User_Cycle/Number_Of_Runs)/1757 = 1.124 DMIPS/MHz
+#   (*) Cycles per Dhrystone:  476
+#   (*) IPC (minstret/mcycle): 0.611
+#         1000000/(User_Cycle/Number_Of_Runs)/1757 = 1.195 DMIPS/MHz
 ```
 
-`Cycles / Dhrystone` 与频率解耦，是后续流水线 / Cache 优化的主指标；`DMIPS/MHz ≈ 1.12` 大致处于「单发射 5 级顺序核」的常见区间（参考 SiFive E31 ≈ 1.61）。仿真版只跑 5 轮，`csrr` 自身的取样开销会带来 ~1–2 % 的轻微偏差，需要更精确数据时可以临时把 `dhry_1.c` 里的 `Number_Of_Runs` 调到 50–100 再跑。
+`Cycles / Dhrystone` 与频率解耦，是后续流水线 / Cache 优化的主指标；`DMIPS/MHz ≈ 1.20` 大致处于「单发射 5 级顺序核」的常见区间（参考 SiFive E31 ≈ 1.61）。相对仅总线 / Cache 优化前（例如 `mcycle`≈2534、`IPC`≈0.574 的旧基线），当前表内数字为**主干最新一次** `make dhrystone` 输出。仿真版只跑 5 轮，`csrr` 自身的取样开销会带来 ~1–2 % 的轻微偏差，需要更精确数据时可以临时把 `dhry_1.c` 里的 `Number_Of_Runs` 调到 50–100 再跑。
 
 ## 目录结构
 

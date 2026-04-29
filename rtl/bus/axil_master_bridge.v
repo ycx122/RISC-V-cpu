@@ -37,6 +37,42 @@
 //      from the previous custom bus.  `bus_data_in` carries the
 //      post-extraction load value in the same cycle `d_bus_ready=1`.
 //
+// FSM (PROCESSOR_IMPROVEMENT_PLAN Tier 4.2 follow-up: combinational
+// handshake)
+// ------------------------------------------------------------------
+// Earlier this file used a 4-state FSM `S_IDLE -> S_R/S_W -> S_DONE
+// -> S_IDLE`, which cost 4 cycles per CPU memory transaction (1 cycle
+// to register AR/AW, 1 cycle for the AR/AW handshake, 1 cycle for
+// R/B, 1 cycle for the parking S_DONE pulse).  Profiling on the data
+// side and on D-Cache line fills showed those cycles dominated the
+// achievable IPC, so the FSM was collapsed to 3 states with the
+// ready-side outputs driven combinationally:
+//
+//   S_IDLE:  m_arvalid / m_awvalid / m_wvalid track `d_bus_en`
+//            combinationally so the AR / AW+W handshake can complete
+//            in the very same cycle the CPU asserts d_bus_en.  A
+//            naturally-misaligned request short-circuits without
+//            issuing an AXI transaction; ack pulses combinationally.
+//
+//   S_R:     waiting for the slave to return R.  m_rready is held
+//            high; the cycle R fires we drive d_bus_ready (and
+//            d_bus_err) combinationally back to the CPU and the CPU
+//            advances reg_3 on the same edge that returns the bridge
+//            to S_IDLE.  No "S_DONE parking cycle" is needed because
+//            the CPU has already consumed the ack by the time the
+//            next cycle starts.
+//
+//   S_W:     mirror of S_R for AW + W transactions.  m_bready is
+//            held high; B fires combinationally onto d_bus_ready.
+//
+// `addr_latch` / `op_latch` are still registered at AR/AW fire time
+// so byte / half-word extraction on R has the right offset even if
+// the slave takes more than one cycle to come back.  This is the
+// "fmax fallback" the plan explicitly called out: the only new
+// combinational paths are `d_addr -> m_araddr / m_awaddr / wdata /
+// wstrb` and `m_rdata -> bus_data_in`; addr_latch keeps the byte-
+// extract mux out of the AR address path on the slave side.
+//
 // Protocol assumptions
 // --------------------
 // * The CPU only issues one outstanding transaction at a time, and keeps
@@ -45,6 +81,14 @@
 //   current `mem_ctrl.v` drive pattern.
 // * `ram_we` and `ram_re` are mutually exclusive and at most one of them
 //   is asserted together with `d_bus_en`.
+// * Slave-side AW/W contract: AW and W are accepted together (`s_awready
+//   & s_wready` both go high in the same cycle).  This holds for every
+//   slave on this SoC -- the local `axil_slave_wrapper.v` only raises
+//   either ready when both AW and W valid are present, and the
+//   interconnect's synthetic SLVERR / DECERR error path acks them
+//   atomically as well.  If a future external slave needs AW/W to fire
+//   independently, this FSM will need an explicit aw_done / w_done
+//   tracker; flagged in `state_next` below.
 // * `aresetn` is active-low.
 // -----------------------------------------------------------------------------
 module axil_master_bridge (
@@ -77,27 +121,27 @@ module axil_master_bridge (
     output wire        d_bus_misalign,
 
     // --- AXI4-Lite master ----------------------------------------------------
-    output reg         m_awvalid,
+    output wire        m_awvalid,
     input  wire        m_awready,
-    output reg  [31:0] m_awaddr,
+    output wire [31:0] m_awaddr,
     output wire [2:0]  m_awprot,
 
-    output reg         m_wvalid,
+    output wire        m_wvalid,
     input  wire        m_wready,
-    output reg  [31:0] m_wdata,
-    output reg  [3:0]  m_wstrb,
+    output wire [31:0] m_wdata,
+    output wire [3:0]  m_wstrb,
 
     input  wire        m_bvalid,
-    output reg         m_bready,
+    output wire        m_bready,
     input  wire [1:0]  m_bresp,
 
-    output reg         m_arvalid,
+    output wire        m_arvalid,
     input  wire        m_arready,
-    output reg  [31:0] m_araddr,
+    output wire [31:0] m_araddr,
     output wire [2:0]  m_arprot,
 
     input  wire        m_rvalid,
-    output reg         m_rready,
+    output wire        m_rready,
     input  wire [31:0] m_rdata,
     input  wire [1:0]  m_rresp
 );
@@ -109,30 +153,21 @@ module axil_master_bridge (
     // -------------------------------------------------------------------------
     // FSM
     // -------------------------------------------------------------------------
-    // S_DONE exists purely to absorb the one cycle where d_bus_ready=1 is
-    // pulsed to the CPU.  Without it, the bridge would transition back to
-    // S_IDLE on the same cycle the CPU first observes d_bus_ready=1, and
-    // would then observe the *old* (not-yet-advanced) d_bus_en / ram_re /
-    // d_addr from the pipeline and fire a duplicate transaction.  Sitting
-    // in S_DONE for exactly one cycle mirrors the old riscv_bus TRANS
-    // state and gives the pipeline the posedge it needs to retire the
-    // load/store before we sample its signals again.
     localparam [1:0] S_IDLE = 2'd0;
     localparam [1:0] S_W    = 2'd1;  // write: AW + W issued, waiting for B
     localparam [1:0] S_R    = 2'd2;  // read : AR issued, waiting for R
-    localparam [1:0] S_DONE = 2'd3;
 
     reg [1:0] state;
 
-    // Latched copy of the CPU request so byte-lane extraction on reads
-    // still sees the correct offset after the CPU pipeline advances past
-    // the load.
+    // Latched copy of the CPU request kept around for the byte-lane
+    // extract mux on the R side.  Captured at the cycle the AR / AW+W
+    // handshake fires (state advancing to S_R / S_W), which is also the
+    // cycle the AXI bus officially "owns" the transaction; the CPU may
+    // hold d_addr stable until d_bus_ready, but using the latch here
+    // keeps the rdata-extract combinational path off d_addr -> m_araddr
+    // -> interconnect entirely.
     reg [31:0] addr_latch;
     reg [2:0]  op_latch;
-    reg [31:0] rdata_latch;
-    reg        d_bus_ready_r;
-    reg        d_bus_err_r;
-    reg        d_bus_misalign_r;
 
     // -------------------------------------------------------------------------
     // Natural-alignment check for the incoming request.  SB / LB / LBU
@@ -159,13 +194,9 @@ module axil_master_bridge (
     wire req_misaligned = misaligned_req(mem_op, d_addr[1:0]);
 
     // -------------------------------------------------------------------------
-    // Write-side data / strobe shaping
+    // Write-side data / strobe shaping (combinational from the live d_addr /
+    // d_data_out / mem_op).
     // -------------------------------------------------------------------------
-    // mem_op encoding (unchanged from the CPU):
-    //   3'b000 : SB  (byte)
-    //   3'b001 : SH  (half-word)
-    //   3'b010 : SW  (word)
-    // For stores the top bit of mem_op is always 0.
     reg [31:0] wdata_shift;
     reg [3:0]  wstrb_shift;
 
@@ -183,10 +214,9 @@ module axil_master_bridge (
                 endcase
             end
             2'b01: begin // SH
-                // Aligned SH: byte_off is 00 or 10.  For 2'b11 the spec
-                // calls for a misaligned-access exception; we fall back
-                // to a single-word transaction here (the ISA regression
-                // suite never exercises this path).
+                // Aligned SH: byte_off is 00 or 10.  byte_off=01/11 trips
+                // the misaligned-trap path above and never makes it to AXI,
+                // so we don't need to fabricate sane wstrb for those.
                 wstrb_shift = 4'b0011 << {byte_off_now[1], 1'b0};
                 if (byte_off_now[1] == 1'b0)
                     wdata_shift = {16'd0, d_data_out[15:0]};
@@ -205,6 +235,33 @@ module axil_master_bridge (
     end
 
     // -------------------------------------------------------------------------
+    // Combinational issue conditions (drive the AXI valid signals directly
+    // from S_IDLE, no register stage in between).
+    // -------------------------------------------------------------------------
+    wire idle_misalign = (state == S_IDLE) & d_bus_en & (ram_we | ram_re) & req_misaligned;
+    wire idle_w_issue  = (state == S_IDLE) & d_bus_en & ram_we & ~req_misaligned;
+    wire idle_r_issue  = (state == S_IDLE) & d_bus_en & ram_re & ~req_misaligned;
+
+    assign m_arvalid = idle_r_issue;
+    assign m_araddr  = {d_addr[31:2], 2'b00};
+
+    assign m_awvalid = idle_w_issue;
+    assign m_awaddr  = {d_addr[31:2], 2'b00};
+    assign m_wvalid  = idle_w_issue;
+    assign m_wdata   = wdata_shift;
+    assign m_wstrb   = wstrb_shift;
+
+    // We hold m_rready / m_bready only while waiting for the
+    // corresponding response, but every slave on this SoC asserts the
+    // response combinationally from the cycle it transitions to its
+    // post-AR / post-AW+W state, so the response always lands AT the
+    // earliest in the cycle right after the address phase fires - by
+    // which point we are already in S_R / S_W with the ready high.
+    // axil_slave_wrapper.v's header documents the matching contract.
+    assign m_rready = (state == S_R);
+    assign m_bready = (state == S_W);
+
+    // -------------------------------------------------------------------------
     // Read-side extraction (uses the latched request so the CPU can have
     // moved on by the cycle this mux fires).
     // -------------------------------------------------------------------------
@@ -216,134 +273,81 @@ module axil_master_bridge (
 
     always @(*) begin
         case (byte_off_latched)
-            2'b00: rb_sel = rdata_latch[7:0];
-            2'b01: rb_sel = rdata_latch[15:8];
-            2'b10: rb_sel = rdata_latch[23:16];
-            2'b11: rb_sel = rdata_latch[31:24];
+            2'b00: rb_sel = m_rdata[7:0];
+            2'b01: rb_sel = m_rdata[15:8];
+            2'b10: rb_sel = m_rdata[23:16];
+            2'b11: rb_sel = m_rdata[31:24];
         endcase
 
         case (byte_off_latched[1])
-            1'b0: rh_sel = rdata_latch[15:0];
-            1'b1: rh_sel = rdata_latch[31:16];
+            1'b0: rh_sel = m_rdata[15:0];
+            1'b1: rh_sel = m_rdata[31:16];
         endcase
 
         case (op_latch)
             3'b000:  rdata_extracted = {{24{rb_sel[7]}},  rb_sel};   // LB
             3'b001:  rdata_extracted = {{16{rh_sel[15]}}, rh_sel};   // LH
-            3'b010:  rdata_extracted = rdata_latch;                  // LW
+            3'b010:  rdata_extracted = m_rdata;                      // LW
             3'b100:  rdata_extracted = {24'd0, rb_sel};              // LBU
             3'b101:  rdata_extracted = {16'd0, rh_sel};              // LHU
-            default: rdata_extracted = rdata_latch;
+            default: rdata_extracted = m_rdata;
         endcase
     end
 
+    // -------------------------------------------------------------------------
+    // Completion pulses (combinational).
+    //
+    // The CPU pipeline (hazard_ctrl / mem_ctrl) treats `d_bus_ready` as a
+    // 1-cycle pulse synchronous to `aclk`.  Driving it combinationally
+    // from `m_rvalid / m_bvalid` means CPU's reg_3 advances on the same
+    // edge the bridge state register transitions back to S_IDLE, so the
+    // very next cycle the CPU presents its post-advance d_bus_en for a
+    // fresh transaction (no extra parking cycle).  See the FSM block
+    // comment up top for the rationale on why this is safe vs. the old
+    // S_DONE design.
+    // -------------------------------------------------------------------------
+    wire write_done = (state == S_W) & m_bvalid & m_bready;
+    wire read_done  = (state == S_R) & m_rvalid & m_rready;
+
     assign bus_data_in    = rdata_extracted;
-    assign d_bus_ready    = d_bus_ready_r;
-    assign d_bus_err      = d_bus_err_r;
-    assign d_bus_misalign = d_bus_misalign_r;
+    assign d_bus_ready    = idle_misalign | write_done | read_done;
+    assign d_bus_err      = (write_done & m_bresp[1]) | (read_done & m_rresp[1]);
+    assign d_bus_misalign = idle_misalign;
 
     // -------------------------------------------------------------------------
-    // Main FSM
+    // FSM next-state.  Address and op are latched into addr_latch / op_latch
+    // when the AR / AW+W handshake fires, regardless of how many cycles the
+    // R / B response actually takes.
     // -------------------------------------------------------------------------
     always @(posedge aclk) begin
         if (!aresetn) begin
-            state         <= S_IDLE;
-            m_awvalid     <= 1'b0;
-            m_awaddr      <= 32'd0;
-            m_wvalid      <= 1'b0;
-            m_wdata       <= 32'd0;
-            m_wstrb       <= 4'd0;
-            m_bready      <= 1'b0;
-            m_arvalid     <= 1'b0;
-            m_araddr      <= 32'd0;
-            m_rready      <= 1'b0;
-            addr_latch       <= 32'd0;
-            op_latch         <= 3'd0;
-            rdata_latch      <= 32'd0;
-            d_bus_ready_r    <= 1'b0;
-            d_bus_err_r      <= 1'b0;
-            d_bus_misalign_r <= 1'b0;
+            state      <= S_IDLE;
+            addr_latch <= 32'd0;
+            op_latch   <= 3'd0;
         end else begin
-            // d_bus_ready / d_bus_err / d_bus_misalign default to a
-            // one-cycle pulse.
-            d_bus_ready_r    <= 1'b0;
-            d_bus_err_r      <= 1'b0;
-            d_bus_misalign_r <= 1'b0;
-
             case (state)
                 S_IDLE: begin
-                    if (d_bus_en & (ram_we | ram_re) & req_misaligned) begin
-                        // Misaligned load/store: short-circuit.  No AXI
-                        // transaction is issued; instead we emit a
-                        // single-cycle completion pulse carrying
-                        // d_bus_misalign=1 and park in S_DONE for one
-                        // cycle to mirror the regular transaction timing
-                        // (so the CPU pipeline retires reg_3 exactly once
-                        // and does not re-issue the same request).  The
-                        // original (misaligned) address still needs to
-                        // end up in mtval, so we latch d_addr without
-                        // forcing the bottom two bits to zero.
-                        addr_latch       <= d_addr;
-                        op_latch         <= mem_op;
-                        d_bus_ready_r    <= 1'b1;
-                        d_bus_misalign_r <= 1'b1;
-                        state            <= S_DONE;
-                    end else if (d_bus_en & ram_we) begin
+                    // misalign keeps state at S_IDLE: the comb ack+misalign
+                    // is enough, no AXI transaction is launched, and the CPU
+                    // has advanced by the next clock edge so we never see
+                    // the same misaligned d_bus_en twice.
+                    if (idle_w_issue & m_awready & m_wready) begin
                         addr_latch <= d_addr;
                         op_latch   <= mem_op;
-                        m_awvalid  <= 1'b1;
-                        m_awaddr   <= {d_addr[31:2], 2'b00};
-                        m_wvalid   <= 1'b1;
-                        m_wdata    <= wdata_shift;
-                        m_wstrb    <= wstrb_shift;
-                        m_bready   <= 1'b1;
                         state      <= S_W;
-                    end else if (d_bus_en & ram_re) begin
+                    end else if (idle_r_issue & m_arready) begin
                         addr_latch <= d_addr;
                         op_latch   <= mem_op;
-                        m_arvalid  <= 1'b1;
-                        m_araddr   <= {d_addr[31:2], 2'b00};
-                        m_rready   <= 1'b1;
                         state      <= S_R;
                     end
                 end
 
                 S_W: begin
-                    if (m_awvalid & m_awready) m_awvalid <= 1'b0;
-                    if (m_wvalid  & m_wready ) m_wvalid  <= 1'b0;
-
-                    if (m_bvalid & m_bready) begin
-                        m_bready      <= 1'b0;
-                        d_bus_ready_r <= 1'b1;
-                        // Bit 1 of AXI BRESP distinguishes SLVERR (2'b10)
-                        // and DECERR (2'b11) from OKAY (2'b00) / EXOKAY
-                        // (2'b01); either error maps to a Store Access
-                        // Fault once it reaches WB.
-                        d_bus_err_r   <= m_bresp[1];
-                        state         <= S_DONE;
-                    end
+                    if (m_bvalid & m_bready) state <= S_IDLE;
                 end
 
                 S_R: begin
-                    if (m_arvalid & m_arready) m_arvalid <= 1'b0;
-
-                    if (m_rvalid & m_rready) begin
-                        rdata_latch   <= m_rdata;
-                        m_rready      <= 1'b0;
-                        d_bus_ready_r <= 1'b1;
-                        // See S_W above: RRESP[1] flags a Load Access Fault.
-                        d_bus_err_r   <= m_rresp[1];
-                        state         <= S_DONE;
-                    end
-                end
-
-                S_DONE: begin
-                    // Exactly one cycle here.  d_bus_ready_r defaults back
-                    // to 0 so the CPU sees a single-cycle completion pulse;
-                    // returning to S_IDLE lets the next (post-advance)
-                    // d_bus_en start a new transaction on the following
-                    // cycle.
-                    state <= S_IDLE;
+                    if (m_rvalid & m_rready) state <= S_IDLE;
                 end
 
                 default: state <= S_IDLE;
@@ -358,8 +362,8 @@ module axil_master_bridge (
     // control-signal bugs during simulation without affecting synthesis.
     always @(posedge aclk) begin
         if (aresetn && m_wvalid && m_wready && (m_wstrb == 4'b0000)) begin
-            $display("[axil_master_bridge] WARN: wstrb=0 write at addr=%h (op_latch=%b) @%0t",
-                     m_awaddr, op_latch, $time);
+            $display("[axil_master_bridge] WARN: wstrb=0 write at addr=%h (mem_op=%b) @%0t",
+                     m_awaddr, mem_op, $time);
         end
     end
 `ifdef BRIDGE_TRACE
@@ -368,8 +372,8 @@ module axil_master_bridge (
             if (m_arvalid && m_arready)
                 $display("[brm] t=%0t AR addr=%h", $time, m_araddr);
             if (m_rvalid && m_rready)
-                $display("[brm] t=%0t R rdata=%h rresp=%b -> latch=%h ext=%h (op=%b boff=%b)",
-                         $time, m_rdata, m_rresp, m_rdata, rdata_extracted, op_latch, addr_latch[1:0]);
+                $display("[brm] t=%0t R rdata=%h rresp=%b -> ext=%h (op=%b boff=%b)",
+                         $time, m_rdata, m_rresp, rdata_extracted, op_latch, addr_latch[1:0]);
             if (m_awvalid && m_awready)
                 $display("[brm] t=%0t AW addr=%h", $time, m_awaddr);
             if (m_wvalid && m_wready)

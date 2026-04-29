@@ -15,8 +15,8 @@ _start:
    4:	80418193          	addi	gp,gp,-2044 # 20000804 <__global_pointer$>
 .option pop
     la      sp, __stack_top
-   8:	20020117          	auipc	sp,0x20020
-   c:	ff810113          	addi	sp,sp,-8 # 20020000 <__stack_top>
+   8:	20040117          	auipc	sp,0x20040
+   c:	ff810113          	addi	sp,sp,-8 # 20040000 <__stack_top>
 
     /* ------------------------------------------------------------- */
     /* Copy .data: ROM LMA at _data_lma into RAM VMA [_data, _edata) */
@@ -346,7 +346,7 @@ static inline void     mmio_write32(uintptr_t addr, uint32_t v) {
 static inline uint32_t mmio_read32(uintptr_t addr) {
     return *(volatile uint32_t *)addr;
  264:	4200c7b7          	lui	a5,0x4200c
- 268:	ffc7a703          	lw	a4,-4(a5) # 4200bffc <__stack_top+0x21febffc>
+ 268:	ffc7a703          	lw	a4,-4(a5) # 4200bffc <__stack_top+0x21fcbffc>
  26c:	ff87a583          	lw	a1,-8(a5)
  270:	ffc7a683          	lw	a3,-4(a5)
     uint32_t hi0, lo, hi1;
@@ -370,7 +370,7 @@ static inline uint64_t clint_schedule_relative(uint64_t delta_ticks)
  288:	420047b7          	lui	a5,0x42004
  28c:	00e585b3          	add	a1,a1,a4
  290:	fff00713          	li	a4,-1
- 294:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fe4004>
+ 294:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fc4004>
  298:	00a7a023          	sw	a0,0(a5)
  29c:	00b7a223          	sw	a1,4(a5)
     clint_set_mtimecmp(deadline);
@@ -704,7 +704,7 @@ static void default_soft(const struct bsp_trap_frame *f)
     clint_clear_ipi();
     default_banner(f, "unhandled msi");
  514:	000015b7          	lui	a1,0x1
- 518:	0007a023          	sw	zero,0(a5) # 42000000 <__stack_top+0x21fe0000>
+ 518:	0007a023          	sw	zero,0(a5) # 42000000 <__stack_top+0x21fc0000>
  51c:	aec58593          	addi	a1,a1,-1300 # aec <uart_printf+0x370>
  520:	f89ff0ef          	jal	ra,4a8 <default_banner>
 
@@ -714,7 +714,7 @@ static void default_soft(const struct bsp_trap_frame *f)
  528:	00112623          	sw	ra,12(sp)
  52c:	420047b7          	lui	a5,0x42004
  530:	fff00713          	li	a4,-1
- 534:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fe4004>
+ 534:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fc4004>
     default_banner(f, "unhandled mti");
  538:	000015b7          	lui	a1,0x1
  53c:	00e7a023          	sw	a4,0(a5)
@@ -814,7 +814,7 @@ void bsp_trap_dispatch(struct bsp_trap_frame *f)
  5dc:	fedff06f          	j	5c8 <bsp_trap_dispatch+0x54>
     return *(volatile uint32_t *)addr;
  5e0:	44200437          	lui	s0,0x44200
- 5e4:	00442583          	lw	a1,4(s0) # 44200004 <__stack_top+0x241e0004>
+ 5e4:	00442583          	lw	a1,4(s0) # 44200004 <__stack_top+0x241c0004>
             if (irq) {
  5e8:	02058a63          	beqz	a1,61c <bsp_trap_dispatch+0xa8>
                 if (irq < IRQ_HANDLER_SLOTS && irq_handlers[irq])
@@ -884,7 +884,7 @@ void bsp_init(void)
  688:	30479073          	csrw	mie,a5
     return *(volatile uint32_t *)addr;
  68c:	442007b7          	lui	a5,0x44200
- 690:	0047a703          	lw	a4,4(a5) # 44200004 <__stack_top+0x241e0004>
+ 690:	0047a703          	lw	a4,4(a5) # 44200004 <__stack_top+0x241c0004>
 
     /* Drain any pending PLIC claim so we don't trip the default_irq    */
     /* fallback on first enable.                                         */
@@ -895,10 +895,10 @@ void bsp_init(void)
  698:	00e7a223          	sw	a4,4(a5)
  69c:	420047b7          	lui	a5,0x42004
  6a0:	fff00713          	li	a4,-1
- 6a4:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fe4004>
+ 6a4:	00e7a223          	sw	a4,4(a5) # 42004004 <__stack_top+0x21fc4004>
  6a8:	00e7a023          	sw	a4,0(a5)
  6ac:	420007b7          	lui	a5,0x42000
- 6b0:	0007a023          	sw	zero,0(a5) # 42000000 <__stack_top+0x21fe0000>
+ 6b0:	0007a023          	sw	zero,0(a5) # 42000000 <__stack_top+0x21fc0000>
     mmio_write32(CLINT_MTIMECMP_HI_ADDR, 0xFFFFFFFFu);
     mmio_write32(CLINT_MTIMECMP_LO_ADDR, 0xFFFFFFFFu);
 
@@ -988,7 +988,7 @@ static void put_uint(uint32_t val, uint32_t base, int upper_case, int pad_width,
  74c:	00e787b3          	add	a5,a5,a4
     mmio_write32(UART_DATA_REG, (uint8_t)c);
  750:	0007c783          	lbu	a5,0(a5)
- 754:	00f6a023          	sw	a5,0(a3) # 43000000 <__stack_top+0x22fe0000>
+ 754:	00f6a023          	sw	a5,0(a3) # 43000000 <__stack_top+0x22fc0000>
     while (i-- > 0) {
  758:	00070793          	mv	a5,a4
  75c:	f85ff06f          	j	6e0 <put_uint+0x28>
@@ -1002,7 +1002,7 @@ static void put_uint(uint32_t val, uint32_t base, int upper_case, int pad_width,
  76c:	00008067          	ret
         uart_putc(*s++);
  770:	00150513          	addi	a0,a0,1
- 774:	00f72023          	sw	a5,0(a4) # 43000000 <__stack_top+0x22fe0000>
+ 774:	00f72023          	sw	a5,0(a4) # 43000000 <__stack_top+0x22fc0000>
  778:	fedff06f          	j	764 <uart_puts+0x4>
 
 0000077c <uart_printf>:
@@ -1077,7 +1077,7 @@ done:
         if (*p != '%') {
  80c:	00978a63          	beq	a5,s1,820 <uart_printf+0xa4>
  810:	43000737          	lui	a4,0x43000
- 814:	00f72023          	sw	a5,0(a4) # 43000000 <__stack_top+0x22fe0000>
+ 814:	00f72023          	sw	a5,0(a4) # 43000000 <__stack_top+0x22fc0000>
     for (const char *p = fmt; *p; p++) {
  818:	00140413          	addi	s0,s0,1
  81c:	fc1ff06f          	j	7dc <uart_printf+0x60>
@@ -1110,7 +1110,7 @@ done:
  864:	02f4e263          	bltu	s1,a5,888 <uart_printf+0x10c>
  868:	f6078ee3          	beqz	a5,7e4 <uart_printf+0x68>
  86c:	430007b7          	lui	a5,0x43000
- 870:	0097a023          	sw	s1,0(a5) # 43000000 <__stack_top+0x22fe0000>
+ 870:	0097a023          	sw	s1,0(a5) # 43000000 <__stack_top+0x22fc0000>
     mmio_write32(UART_DATA_REG, (uint8_t)c);
  874:	00044703          	lbu	a4,0(s0)
  878:	0340006f          	j	8ac <uart_printf+0x130>
@@ -1130,7 +1130,7 @@ done:
     mmio_write32(UART_DATA_REG, (uint8_t)c);
  8a4:	0007c703          	lbu	a4,0(a5)
  8a8:	430007b7          	lui	a5,0x43000
- 8ac:	00e7a023          	sw	a4,0(a5) # 43000000 <__stack_top+0x22fe0000>
+ 8ac:	00e7a023          	sw	a4,0(a5) # 43000000 <__stack_top+0x22fc0000>
  8b0:	f69ff06f          	j	818 <uart_printf+0x9c>
         switch (*p) {
  8b4:	07300613          	li	a2,115
@@ -1163,7 +1163,7 @@ done:
  90c:	00000613          	li	a2,0
  910:	09c0006f          	j	9ac <uart_printf+0x230>
  914:	430007b7          	lui	a5,0x43000
- 918:	0097a023          	sw	s1,0(a5) # 43000000 <__stack_top+0x22fe0000>
+ 918:	0097a023          	sw	s1,0(a5) # 43000000 <__stack_top+0x22fc0000>
  91c:	efdff06f          	j	818 <uart_printf+0x9c>
             const char *s = va_arg(ap, const char *);
  920:	00c12783          	lw	a5,12(sp)
@@ -1186,7 +1186,7 @@ done:
  950:	02055263          	bgez	a0,974 <uart_printf+0x1f8>
  954:	02d00613          	li	a2,45
  958:	430007b7          	lui	a5,0x43000
- 95c:	00c7a023          	sw	a2,0(a5) # 43000000 <__stack_top+0x22fe0000>
+ 95c:	00c7a023          	sw	a2,0(a5) # 43000000 <__stack_top+0x22fc0000>
         put_uint((uint32_t)(-(int64_t)val), 10, 0, pad_width, pad_char);
  960:	00a00593          	li	a1,10
  964:	00000613          	li	a2,0
@@ -1220,14 +1220,14 @@ done:
 Disassembly of section .rodata:
 
 000009b4 <digits_lower.1025-0x158>:
- 9b4:	645f736f          	jal	t1,f87f8 <__stack_size+0xf47f8>
+ 9b4:	645f736f          	jal	t1,f87f8 <__stack_size+0xf07f8>
  9b8:	6d65                	lui	s10,0x19
- 9ba:	6f62206f          	j	230b0 <__stack_size+0x1f0b0>
- 9be:	000a746f          	jal	s0,a79be <__stack_size+0xa39be>
+ 9ba:	6f62206f          	j	230b0 <__stack_size+0x1b0b0>
+ 9be:	000a746f          	jal	s0,a79be <__stack_size+0x9f9be>
  9c2:	0000                	unimp
- 9c4:	645f736f          	jal	t1,f8808 <__stack_size+0xf4808>
+ 9c4:	645f736f          	jal	t1,f8808 <__stack_size+0xf0808>
  9c8:	6d65                	lui	s10,0x19
- 9ca:	74203a6f          	jal	s4,410c <__stack_size+0x10c>
+ 9ca:	74203a6f          	jal	s4,410c <_data_lma+0x35cc>
  9ce:	7361                	lui	t1,0xffff8
  9d0:	72635f6b          	0x72635f6b
  9d4:	6165                	addi	sp,sp,112
@@ -1238,7 +1238,7 @@ Disassembly of section .rodata:
  9de:	0a64                	addi	s1,sp,284
  9e0:	0000                	unimp
  9e2:	0000                	unimp
- 9e4:	645f736f          	jal	t1,f8828 <__stack_size+0xf4828>
+ 9e4:	645f736f          	jal	t1,f8828 <__stack_size+0xf0828>
  9e8:	6d65                	lui	s10,0x19
  9ea:	61203a6f          	jal	s4,3ffc <_data_lma+0x34bc>
  9ee:	6c6c                	flw	fa1,92(s0)
@@ -1439,7 +1439,7 @@ static bsp_trap_handler_t soft_handler;
 
 Disassembly of section .stack:
 
-2001c000 <__stack_top-0x4000>:
+20038000 <__stack_top-0x8000>:
 	...
 
 Disassembly of section .riscv.attributes:
@@ -1462,7 +1462,7 @@ Disassembly of section .riscv.attributes:
     la      a1, _data
   18:	7032                	flw	ft0,44(sp)
   1a:	5f30                	lw	a2,120(a4)
-  1c:	326d                	jal	fffff9c6 <__stack_top+0xdffdf9c6>
+  1c:	326d                	jal	fffff9c6 <__stack_top+0xdffbf9c6>
   1e:	3070                	fld	fa2,224(s0)
 	...
 
@@ -1774,7 +1774,7 @@ Disassembly of section .debug_info:
      1c8:	0111                	addi	sp,sp,4
      1ca:	055a                	slli	a0,a0,0x16
         uart_printf("[task1] iter=%d tick=%u\n", i, timer_count);
-     1cc:	00020c03          	lb	s8,0(tp) # fffe1000 <__stack_top+0xdffc1000>
+     1cc:	00020c03          	lb	s8,0(tp) # fffe1000 <__stack_top+0xdffa1000>
     for (int i = 0; i < TASK_ITERS; i++) {
      1d0:	0000                	unimp
      1d2:	0010                	0x10
@@ -1798,7 +1798,7 @@ Disassembly of section .debug_info:
      1f0:	0000                	unimp
      1f2:	3810                	fld	fa2,48(s0)
     task_done[1] = 1;
-     1f4:	86000003          	lb	zero,-1952(zero) # fffff860 <__stack_top+0xdffdf860>
+     1f4:	86000003          	lb	zero,-1952(zero) # fffff860 <__stack_top+0xdffbf860>
      1f8:	0005                	c.nop	1
      1fa:	0900                	addi	s0,sp,144
      1fc:	0002                	c.slli64	zero
@@ -1845,7 +1845,7 @@ Disassembly of section .debug_info:
      244:	0000                	unimp
      246:	4601                	li	a2,0
         task_yield();
-     248:	b00d                	j	fffffa6a <__stack_top+0xdffdfa6a>
+     248:	b00d                	j	fffffa6a <__stack_top+0xdffbfa6a>
      24a:	0001                	nop
     for (int i = 0; i < TASK_ITERS; i++) {
      24c:	5c00                	lw	s0,56(s0)
@@ -1898,7 +1898,7 @@ Disassembly of section .debug_info:
      2a0:	007d                	c.nop	31
      2a2:	0000                	unimp
     timer_count++;
-     2a4:	3a01                	jal	fffffbb4 <__stack_top+0xdffdfbb4>
+     2a4:	3a01                	jal	fffffbb4 <__stack_top+0xdffbfbb4>
      2a6:	0c0d                	addi	s8,s8,3
      2a8:	0002                	c.slli64	zero
      2aa:	5800                	lw	s0,48(s0)
@@ -2052,7 +2052,7 @@ Disassembly of section .debug_info:
      3b6:	0054                	addi	a3,sp,4
     c->ra = (uint32_t)(uintptr_t)entry;
      3b8:	0000                	unimp
-     3ba:	992e4903          	lbu	s2,-1646(t3) # 19992 <__stack_size+0x15992>
+     3ba:	992e4903          	lbu	s2,-1646(t3) # 19992 <__stack_size+0x11992>
      3be:	0000                	unimp
     c->sp = (uint32_t)(uintptr_t)&stacks[id][SCHED_STACK_SIZE];
      3c0:	0000                	unimp
@@ -2067,7 +2067,7 @@ Disassembly of section .debug_info:
      3d0:	0054                	addi	a3,sp,4
      3d2:	0000                	unimp
     c->ra = (uint32_t)(uintptr_t)entry;
-     3d4:	992f4503          	lbu	a0,-1646(t5) # 19992 <__stack_size+0x15992>
+     3d4:	992f4503          	lbu	a0,-1646(t5) # 19992 <__stack_size+0x11992>
     c->sp = (uint32_t)(uintptr_t)&stacks[id][SCHED_STACK_SIZE];
      3d8:	0000                	unimp
      3da:	1c00                	addi	s0,sp,560
@@ -2120,7 +2120,7 @@ Disassembly of section .debug_info:
 }
      432:	8c22                	mv	s8,s0
     sw   ra,  0(a0)
-     434:	a2000003          	lb	zero,-1504(zero) # fffffa20 <__stack_top+0xdffdfa20>
+     434:	a2000003          	lb	zero,-1504(zero) # fffffa20 <__stack_top+0xdffbfa20>
     sw   sp,  4(a0)
      438:	0000                	unimp
      43a:	1e00                	addi	s0,sp,816
@@ -2144,7 +2144,7 @@ Disassembly of section .debug_info:
      454:	0000                	unimp
      456:	b524                	fsd	fs1,104(a0)
     sw   s7, 36(a0)
-     458:	c3000003          	lb	zero,-976(zero) # fffffc30 <__stack_top+0xdffdfc30>
+     458:	c3000003          	lb	zero,-976(zero) # fffffc30 <__stack_top+0xdffbfc30>
     sw   s8, 40(a0)
      45c:	0000                	unimp
      45e:	0000                	unimp
@@ -2163,7 +2163,7 @@ Disassembly of section .debug_info:
      472:	0000                	unimp
     lw   s0,  8(a1)
      474:	b524                	fsd	fs1,104(a0)
-     476:	db000003          	lb	zero,-592(zero) # fffffdb0 <__stack_top+0xdffdfdb0>
+     476:	db000003          	lb	zero,-592(zero) # fffffdb0 <__stack_top+0xdffbfdb0>
     lw   s1, 12(a1)
      47a:	0000                	unimp
     lw   s2, 16(a1)
@@ -2181,7 +2181,7 @@ Disassembly of section .debug_info:
      48c:	0f34                	addi	a3,sp,920
      48e:	b524                	fsd	fs1,104(a0)
     lw   s7, 36(a1)
-     490:	f3000003          	lb	zero,-208(zero) # ffffff30 <__stack_top+0xdffdff30>
+     490:	f3000003          	lb	zero,-208(zero) # ffffff30 <__stack_top+0xdffbff30>
     lw   s8, 40(a1)
      494:	0000                	unimp
      496:	0000                	unimp
@@ -2189,7 +2189,7 @@ Disassembly of section .debug_info:
      498:	0000                	unimp
      49a:	5526                	lw	a0,104(sp)
     lw   s10,48(a1)
-     49c:	88000003          	lb	zero,-1920(zero) # fffff880 <__stack_top+0xdffdf880>
+     49c:	88000003          	lb	zero,-1920(zero) # fffff880 <__stack_top+0xdffbf880>
     lw   s11,52(a1)
      4a0:	0002                	c.slli64	zero
      4a2:	4800                	lw	s0,16(s0)
@@ -2223,7 +2223,7 @@ Disassembly of section .debug_info:
      4d6:	0001                	nop
      4d8:	0000                	unimp
      4da:	c220                	sw	s0,64(a2)
-     4dc:	98000003          	lb	zero,-1664(zero) # fffff980 <__stack_top+0xdffdf980>
+     4dc:	98000003          	lb	zero,-1664(zero) # fffff980 <__stack_top+0xdffbf980>
      4e0:	0002                	c.slli64	zero
      4e2:	0400                	addi	s0,sp,512
      4e4:	0000                	unimp
@@ -2256,7 +2256,7 @@ Disassembly of section .debug_info:
     default_banner(f, "unhandled msi");
      516:	0000017b          	0x17b
      51a:	cf24                	sw	s1,88(a4)
-     51c:	8e000003          	lb	zero,-1824(zero) # fffff8e0 <__stack_top+0xdffdf8e0>
+     51c:	8e000003          	lb	zero,-1824(zero) # fffff8e0 <__stack_top+0xdffbf8e0>
      520:	0001                	nop
      522:	0000                	unimp
 {
@@ -2271,7 +2271,7 @@ Disassembly of section .debug_info:
     default_banner(f, "unhandled mti");
      538:	0002                	c.slli64	zero
      53a:	0600                	addi	s0,sp,768
-     53c:	59270623          	sb	s2,1420(a4) # fffe158c <__stack_top+0xdffc158c>
+     53c:	59270623          	sb	s2,1420(a4) # fffe158c <__stack_top+0xdffa158c>
      540:	0000                	unimp
      542:	5900                	lw	s0,48(a0)
      544:	0000                	unimp
@@ -2402,7 +2402,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      62c:	0000                	unimp
      62e:	0205                	addi	tp,tp,1
      630:	38000003          	lb	zero,896(zero) # 380 <task_create+0x8>
-     634:	47081903          	lh	s2,1136(a6) # ffff9470 <__stack_top+0xdffd9470>
+     634:	47081903          	lh	s2,1136(a6) # ffff9470 <__stack_top+0xdffb9470>
     for (;;) {}
      638:	0001                	nop
      63a:	0600                	addi	s0,sp,768
@@ -2504,7 +2504,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      710:	0800                	addi	s0,sp,16
      712:	007c                	addi	a5,sp,12
      714:	0000                	unimp
-     716:	007c0a03          	lb	s4,7(s8) # fffe1007 <__stack_top+0xdffc1007>
+     716:	007c0a03          	lb	s4,7(s8) # fffe1007 <__stack_top+0xdffa1007>
      71a:	0000                	unimp
             val /= base;
      71c:	07ff                	0x7ff
@@ -2690,7 +2690,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      864:	01e8                	addi	a0,sp,204
      866:	0000                	unimp
      868:	c60c                	sw	a1,8(a2)
-     86a:	b2000003          	lb	zero,-1248(zero) # fffffb20 <__stack_top+0xdffdfb20>
+     86a:	b2000003          	lb	zero,-1248(zero) # fffffb20 <__stack_top+0xdffbfb20>
      86e:	0000                	unimp
      870:	c000                	sw	s0,0(s0)
      872:	0001                	nop
@@ -2710,21 +2710,21 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      88a:	0300                	addi	s0,sp,384
      88c:	0508                	addi	a0,sp,640
      88e:	00000177          	0x177
-     892:	aa041003          	lh	zero,-1376(s0) # 7aa0 <__stack_size+0x3aa0>
+     892:	aa041003          	lh	zero,-1376(s0) # 7aa0 <_data_lma+0x6f60>
      896:	0004                	0x4
             uart_putc((char)va_arg(ap, int));
      898:	0300                	addi	s0,sp,384
      89a:	0601                	addi	a2,a2,0
      89c:	0071                	c.nop	28
      89e:	0000                	unimp
-     8a0:	9a050203          	lb	tp,-1632(a0) # fffe19a0 <__stack_top+0xdffc19a0>
+     8a0:	9a050203          	lb	tp,-1632(a0) # fffe19a0 <__stack_top+0xdffa19a0>
     mmio_write32(UART_DATA_REG, (uint8_t)c);
      8a4:	0001                	nop
      8a6:	0300                	addi	s0,sp,384
      8a8:	0504                	addi	s1,sp,640
      8aa:	017c                	addi	a5,sp,140
      8ac:	0000                	unimp
-     8ae:	6f080103          	lb	sp,1776(a6) # 26ec4 <__stack_size+0x22ec4>
+     8ae:	6f080103          	lb	sp,1776(a6) # 26ec4 <__stack_size+0x1eec4>
      8b2:	0000                	unimp
         switch (*p) {
      8b4:	0300                	addi	s0,sp,384
@@ -3600,7 +3600,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1048:	0000                	unimp
     104a:	07ff040b          	0x7ff040b
     104e:	0000                	unimp
-    1050:	78080103          	lb	sp,1920(a6) # 8780 <__stack_size+0x4780>
+    1050:	78080103          	lb	sp,1920(a6) # 8780 <__stack_size+0x780>
     1054:	0000                	unimp
     1056:	0800                	addi	s0,sp,16
     1058:	07f8                	addi	a4,sp,972
@@ -3621,7 +3621,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     107c:	1851                	addi	a6,a6,-12
     107e:	0064                	addi	s1,sp,12
     1080:	0000                	unimp
-    1082:	036e2a03          	lw	s4,54(t3) # 62c76 <__stack_size+0x5ec76>
+    1082:	036e2a03          	lw	s4,54(t3) # 62c76 <__stack_size+0x5ac76>
     1086:	0000                	unimp
     1088:	5c02                	lw	s8,32(sp)
     108a:	0314                	addi	a3,sp,384
@@ -3644,7 +3644,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     10b6:	2c00                	fld	fs0,24(s0)
     10b8:	0054                	addi	a3,sp,4
     10ba:	0000                	unimp
-    10bc:	7e2f4503          	lbu	a0,2018(t5) # 86754 <__stack_size+0x82754>
+    10bc:	7e2f4503          	lbu	a0,2018(t5) # 86754 <__stack_size+0x7e754>
     10c0:	0000                	unimp
     10c2:	2400                	fld	fs0,8(s0)
     10c4:	0076                	c.slli	zero,0x1d
@@ -3662,7 +3662,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     10de:	9800                	0x9800
     10e0:	0002                	c.slli64	zero
     10e2:	0700                	addi	s0,sp,896
-    10e4:	b9000623          	sb	a6,-1140(zero) # fffffb8c <__stack_top+0xdffdfb8c>
+    10e4:	b9000623          	sb	a6,-1140(zero) # fffffb8c <__stack_top+0xdffbfb8c>
     10e8:	0005                	c.nop	1
     10ea:	0400                	addi	s0,sp,512
     10ec:	4a00                	lw	s0,16(a2)
@@ -3686,7 +3686,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1112:	1b28                	addi	a0,sp,440
     1114:	0031                	c.nop	12
     1116:	0000                	unimp
-    1118:	04db0403          	lb	s0,77(s6) # 86f8f <__stack_size+0x82f8f>
+    1118:	04db0403          	lb	s0,77(s6) # 86f8f <__stack_size+0x7ef8f>
     111c:	0000                	unimp
     111e:	1802                	slli	a6,a6,0x20
     1120:	0005                	c.nop	1
@@ -3737,7 +3737,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1180:	009d                	addi	ra,ra,7
     1182:	0000                	unimp
     1184:	0404                	addi	s1,sp,512
-    1186:	00013307          	fld	ft6,0(sp) # 81aa6 <__stack_size+0x7daa6>
+    1186:	00013307          	fld	ft6,0(sp) # 81aa6 <__stack_size+0x79aa6>
     118a:	0400                	addi	s0,sp,512
     118c:	0708                	addi	a0,sp,896
     118e:	012e                	slli	sp,sp,0xb
@@ -3776,7 +3776,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     11da:	0100                	addi	s0,sp,128
     11dc:	0d55                	addi	s10,s10,21
     11de:	00000037          	lui	zero,0x0
-    11e2:	7fbc9103          	lh	sp,2043(s9) # 47fb <__stack_size+0x7fb>
+    11e2:	7fbc9103          	lh	sp,2043(s9) # 47fb <_data_lma+0x3cbb>
     11e6:	070a                	slli	a4,a4,0x2
     11e8:	0005                	c.nop	1
     11ea:	0100                	addi	s0,sp,128
@@ -4179,7 +4179,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     155a:	0462                	slli	s0,s0,0x18
     155c:	0000                	unimp
     155e:	3121                	jal	1166 <_data_lma+0x626>
-    1560:	87000003          	lb	zero,-1936(zero) # fffff870 <__stack_top+0xdffdf870>
+    1560:	87000003          	lb	zero,-1936(zero) # fffff870 <__stack_top+0xdffbf870>
     1564:	0004                	0x4
     1566:	2200                	fld	fs0,0(a2)
     1568:	00b2                	slli	ra,ra,0xc
@@ -4391,7 +4391,7 @@ Disassembly of section .debug_abbrev:
   3c:	0008                	0x8
   3e:	0600                	addi	s0,sp,768
     la      a0, _fbss
-  40:	0e030113          	addi	sp,t1,224 # ffffa0e0 <__stack_top+0xdffda0e0>
+  40:	0e030113          	addi	sp,t1,224 # ffffa0e0 <__stack_top+0xdffba0e0>
   44:	0b3a0b0b          	0xb3a0b0b
     la      a1, _end
   48:	0b390b3b          	0xb390b3b
@@ -4437,7 +4437,7 @@ Disassembly of section .debug_abbrev:
   90:	1349                	addi	t1,t1,-14
   92:	0000                	unimp
     sw      x9,  OFF_X(9)(sp)
-  94:	340d                	jal	fffffab6 <__stack_top+0xdffdfab6>
+  94:	340d                	jal	fffffab6 <__stack_top+0xdffbfab6>
   96:	0300                	addi	s0,sp,384
     sw      x10, OFF_X(10)(sp)
   98:	3a0e                	fld	fs4,224(sp)
@@ -4476,7 +4476,7 @@ Disassembly of section .debug_abbrev:
   d0:	0182                	c.slli64	gp
   d2:	1101                	addi	sp,sp,-32
     sw      x25, OFF_X(25)(sp)
-  d4:	3101                	jal	fffffcd4 <__stack_top+0xdffdfcd4>
+  d4:	3101                	jal	fffffcd4 <__stack_top+0xdffbfcd4>
   d6:	00130113          	addi	sp,t1,1
     sw      x26, OFF_X(26)(sp)
   da:	1100                	addi	s0,sp,160
@@ -4560,7 +4560,7 @@ Disassembly of section .debug_abbrev:
  15a:	1349                	addi	t1,t1,-14
     lw      x13, OFF_X(13)(sp)
  15c:	0000                	unimp
- 15e:	3419                	jal	fffffb64 <__stack_top+0xdffdfb64>
+ 15e:	3419                	jal	fffffb64 <__stack_top+0xdffbfb64>
     lw      x14, OFF_X(14)(sp)
  160:	0300                	addi	s0,sp,384
  162:	3a0e                	fld	fs4,224(sp)
@@ -4600,7 +4600,7 @@ Disassembly of section .debug_abbrev:
  19c:	0000                	unimp
  19e:	2e1d                	jal	4d4 <default_banner+0x2c>
     lw      x30, OFF_X(30)(sp)
- 1a0:	3101                	jal	fffffda0 <__stack_top+0xdffdfda0>
+ 1a0:	3101                	jal	fffffda0 <__stack_top+0xdffbfda0>
  1a2:	12011113          	0x12011113
     lw      x31, OFF_X(31)(sp)
  1a6:	4006                	0x4006
@@ -4613,14 +4613,14 @@ Disassembly of section .debug_abbrev:
 {
  1b0:	341e                	fld	fs0,480(sp)
  1b2:	3100                	fld	fs0,32(a0)
- 1b4:	00180213          	addi	tp,a6,1 # fffe0001 <__stack_top+0xdffc0001>
+ 1b4:	00180213          	addi	tp,a6,1 # fffe0001 <__stack_top+0xdffa0001>
  1b8:	1f00                	addi	s0,sp,944
  1ba:	0005                	c.nop	1
  1bc:	1331                	addi	t1,t1,-20
  1be:	051c                	addi	a5,sp,640
  1c0:	0000                	unimp
  1c2:	1d20                	addi	s0,sp,696
- 1c4:	3101                	jal	fffffdc4 <__stack_top+0xdffdfdc4>
+ 1c4:	3101                	jal	fffffdc4 <__stack_top+0xdffbfdc4>
  1c6:	12011113          	0x12011113
     for (int i = 0; i < TASK_ITERS; i++) {
  1ca:	5806                	lw	a6,96(sp)
@@ -4635,7 +4635,7 @@ Disassembly of section .debug_abbrev:
  1dc:	0000                	unimp
  1de:	3422                	fld	fs0,40(sp)
  1e0:	3100                	fld	fs0,32(a0)
- 1e2:	00170213          	addi	tp,a4,1 # fffe4001 <__stack_top+0xdffc4001>
+ 1e2:	00170213          	addi	tp,a4,1 # fffe4001 <__stack_top+0xdffa4001>
  1e6:	2300                	fld	fs0,0(a4)
     for (int i = 0; i < TASK_ITERS; i++) {
  1e8:	011d                	addi	sp,sp,7
@@ -4663,7 +4663,7 @@ Disassembly of section .debug_abbrev:
  20e:	0b59                	addi	s6,s6,22
  210:	00000b57          	0xb57
  214:	1d26                	slli	s10,s10,0x29
- 216:	3101                	jal	fffffe16 <__stack_top+0xdffdfe16>
+ 216:	3101                	jal	fffffe16 <__stack_top+0xdffbfe16>
  218:	55015213          	0x55015213
  21c:	590b5817          	auipc	a6,0x590b5
  220:	000b570b          	0xb570b
@@ -4841,7 +4841,7 @@ Disassembly of section .debug_abbrev:
     struct sched_ctx *c = &tasks[id];
  398:	0111                	addi	sp,sp,4
  39a:	0112                	slli	sp,sp,0x4
- 39c:	0e1b0e03          	lb	t3,225(s6) # 40e1 <__stack_size+0xe1>
+ 39c:	0e1b0e03          	lb	t3,225(s6) # 40e1 <_data_lma+0x35a1>
  3a0:	0e25                	addi	t3,t3,9
  3a2:	00000513          	li	a0,0
  3a6:	0100                	addi	s0,sp,128
@@ -5441,7 +5441,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
  876:	0b20                	addi	s0,sp,408
  878:	1301                	addi	t1,t1,-32
  87a:	0000                	unimp
- 87c:	31012e27          	fsw	fa6,796(sp) # 130a28 <__stack_size+0x12ca28>
+ 87c:	31012e27          	fsw	fa6,796(sp) # 130a28 <__stack_size+0x128a28>
         pad_char  = ' ';
  880:	12011113          	0x12011113
  884:	4006                	0x4006
@@ -5528,7 +5528,7 @@ Disassembly of section .debug_loc:
   52:	024c                	addi	a1,sp,260
     sw      zero, 0(a0)
   54:	0000                	unimp
-  56:	7f780003          	lb	zero,2039(a6) # 590b6009 <__stack_top+0x39096009>
+  56:	7f780003          	lb	zero,2039(a6) # 590b6009 <__stack_top+0x39076009>
     addi    a0, a0, 4
   5a:	4c9f 0002 6400      	0x640000024c9f
     call    main
@@ -5758,7 +5758,7 @@ Disassembly of section .debug_loc:
  1d6:	0000                	unimp
  1d8:	0000                	unimp
  1da:	7800                	flw	fs0,48(s0)
- 1dc:	e0000003          	lb	zero,-512(zero) # fffffe00 <__stack_top+0xdffdfe00>
+ 1dc:	e0000003          	lb	zero,-512(zero) # fffffe00 <__stack_top+0xdffbfe00>
  1e0:	01000003          	lb	zero,16(zero) # 10 <_start+0x10>
  1e4:	5a00                	lw	s0,48(a2)
  1e6:	03e0                	addi	s0,sp,460
@@ -5782,7 +5782,7 @@ Disassembly of section .debug_loc:
     for (;;) task_yield();
  204:	0000                	unimp
  206:	9800                	0x9800
- 208:	dc000003          	lb	zero,-576(zero) # fffffdc0 <__stack_top+0xdffdfdc0>
+ 208:	dc000003          	lb	zero,-576(zero) # fffffdc0 <__stack_top+0xdffbfdc0>
 {
  20c:	01000003          	lb	zero,16(zero) # 10 <_start+0x10>
  210:	5d00                	lw	s0,56(a0)
@@ -6021,7 +6021,7 @@ Disassembly of section .debug_loc:
  3e4:	0000                	unimp
  3e6:	05c8                	addi	a0,sp,708
  3e8:	0000                	unimp
- 3ea:	847e0003          	lb	zero,-1977(t3) # 5847 <__stack_size+0x1847>
+ 3ea:	847e0003          	lb	zero,-1977(t3) # 5847 <_data_lma+0x4d07>
     if (ntasks <= 1) return;
  3ee:	c801                	beqz	s0,3fe <task_yield+0x12>
  3f0:	0005                	c.nop	1
@@ -7868,7 +7868,7 @@ Disassembly of section .debug_line:
       90:	2f737473          	csrrci	s0,0x2f7,6
     sw      x9,  OFF_X(9)(sp)
       94:	6f74                	flw	fa3,92(a4)
-      96:	68636c6f          	jal	s8,3671c <__stack_size+0x3271c>
+      96:	68636c6f          	jal	s8,3671c <__stack_size+0x2e71c>
     sw      x10, OFF_X(10)(sp)
       9a:	6961                	lui	s2,0x18
     sw      x11, OFF_X(11)(sp)
@@ -7913,7 +7913,7 @@ Disassembly of section .debug_line:
       d4:	7562                	flw	fa0,56(sp)
       d6:	746e                	flw	fs0,248(sp)
     sw      x26, OFF_X(26)(sp)
-      d8:	3175                	jal	fffffd84 <__stack_top+0xdffdfd84>
+      d8:	3175                	jal	fffffd84 <__stack_top+0xdffbfd84>
       da:	2f34                	fld	fa3,88(a4)
     sw      x27, OFF_X(27)(sp)
       dc:	696c                	flw	fa1,84(a0)
@@ -8008,7 +8008,7 @@ Disassembly of section .debug_line:
     lw      x14, OFF_X(14)(sp)
      162:	0505                	addi	a0,a0,1
     lw      x15, OFF_X(15)(sp)
-     164:	00090103          	lb	sp,0(s2) # 18000 <__stack_size+0x14000>
+     164:	00090103          	lb	sp,0(s2) # 18000 <__stack_size+0x10000>
     lw      x16, OFF_X(16)(sp)
      168:	0100                	addi	s0,sp,128
      16a:	0a05                	addi	s4,s4,1
@@ -8045,7 +8045,7 @@ Disassembly of section .debug_line:
      194:	0009                	c.nop	2
      196:	0402                	c.slli64	s0
     lw      x28, OFF_X(28)(sp)
-     198:	01030603          	lb	a2,16(t1) # b010 <__stack_size+0x7010>
+     198:	01030603          	lb	a2,16(t1) # b010 <__stack_size+0x3010>
     lw      x29, OFF_X(29)(sp)
      19c:	0409                	addi	s0,s0,2
      19e:	0100                	addi	s0,sp,128
@@ -8067,13 +8067,13 @@ Disassembly of section .debug_line:
      1b6:	0501                	addi	a0,a0,0
      1b8:	0009                	c.nop	2
      1ba:	0402                	c.slli64	s0
-     1bc:	09020303          	lb	t1,144(tp) # ffff8090 <__stack_top+0xdffd8090>
+     1bc:	09020303          	lb	t1,144(tp) # ffff8090 <__stack_top+0xdffb8090>
      1c0:	0004                	0x4
      1c2:	0501                	addi	a0,a0,0
      1c4:	0005                	c.nop	1
      1c6:	0402                	c.slli64	s0
     for (int i = 0; i < TASK_ITERS; i++) {
-     1c8:	097e0303          	lb	t1,151(t3) # 1a097 <__stack_size+0x16097>
+     1c8:	097e0303          	lb	t1,151(t3) # 1a097 <__stack_size+0x12097>
         uart_printf("[task1] iter=%d tick=%u\n", i, timer_count);
      1cc:	0004                	0x4
      1ce:	0601                	addi	a2,a2,0
@@ -8208,7 +8208,7 @@ Disassembly of section .debug_line:
      2b8:	0902                	c.slli64	s2
      2ba:	0000                	unimp
      2bc:	0401                	addi	s0,s0,0
-     2be:	060c0503          	lb	a0,96(s8) # 19060 <__stack_size+0x15060>
+     2be:	060c0503          	lb	a0,96(s8) # 19060 <__stack_size+0x11060>
      2c2:	00097803          	0x97803
     bsp_init();
      2c6:	0100                	addi	s0,sp,128
@@ -8229,7 +8229,7 @@ Disassembly of section .debug_line:
      2de:	0000                	unimp
     bsp_enable_timer_interrupt();
      2e0:	0401                	addi	s0,s0,0
-     2e2:	03050503          	lb	a0,48(a0) # fffeb030 <__stack_top+0xdffcb030>
+     2e2:	03050503          	lb	a0,48(a0) # fffeb030 <__stack_top+0xdffab030>
     bsp_irq_enable();
      2e6:	0918                	addi	a4,sp,144
     sched_init();
@@ -8300,7 +8300,7 @@ Disassembly of section .debug_line:
      368:	0000096f          	jal	s2,368 <sched_init+0x4>
     cur_task = 0;
      36c:	0401                	addi	s0,s0,0
-     36e:	09040303          	lb	t1,144(s0) # ffff7090 <__stack_top+0xdffd7090>
+     36e:	09040303          	lb	t1,144(s0) # ffff7090 <__stack_top+0xdffb7090>
      372:	0000                	unimp
 }
      374:	0501                	addi	a0,a0,0
@@ -8565,7 +8565,7 @@ Disassembly of section .debug_line:
      526:	7570                	flw	fa2,108(a0)
      528:	2f77732f          	0x2f77732f
      52c:	7270                	flw	fa2,100(a2)
-     52e:	6172676f          	jal	a4,27344 <__stack_size+0x23344>
+     52e:	6172676f          	jal	a4,27344 <__stack_size+0x1f344>
      532:	736d                	lui	t1,0xffffb
      534:	5f736f2f          	0x5f736f2f
     default_banner(f, "unhandled mti");
@@ -8609,7 +8609,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
         switch (code) {
      588:	332e                	fld	ft6,232(sp)
      58a:	302e                	fld	ft0,232(sp)
-     58c:	322d                	jal	fffffeb6 <__stack_top+0xdffdfeb6>
+     58c:	322d                	jal	fffffeb6 <__stack_top+0xdffbfeb6>
      58e:	3230                	fld	fa2,96(a2)
 {
      590:	2e30                	fld	fa2,88(a2)
@@ -8624,7 +8624,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      5a4:	6275                	lui	tp,0x1d
      5a6:	6e75                	lui	t3,0x1d
      5a8:	7574                	flw	fa3,108(a0)
-     5aa:	3431                	jal	ffffffb6 <__stack_top+0xdffdffb6>
+     5aa:	3431                	jal	ffffffb6 <__stack_top+0xdffbffb6>
             (soft_handler ? soft_handler : default_soft)(f);
      5ac:	62696c2f          	0x62696c2f
      5b0:	6363672f          	0x6363672f
@@ -8751,7 +8751,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      6a0:	0501                	addi	a0,a0,0
      6a2:	0009                	c.nop	2
      6a4:	0402                	c.slli64	s0
-     6a6:	0a030603          	lb	a2,160(t1) # ffff90a0 <__stack_top+0xdffd90a0>
+     6a6:	0a030603          	lb	a2,160(t1) # ffff90a0 <__stack_top+0xdffb90a0>
      6aa:	1409                	addi	s0,s0,-30
      6ac:	0100                	addi	s0,sp,128
      6ae:	0e05                	addi	t3,t3,1
@@ -8766,7 +8766,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     const char *digits = upper_case ? digits_upper : digits_lower;
      6bc:	0005                	c.nop	1
      6be:	0402                	c.slli64	s0
-     6c0:	097f0303          	lb	t1,151(t5) # 1b097 <__stack_size+0x17097>
+     6c0:	097f0303          	lb	t1,151(t5) # 1b097 <__stack_size+0x13097>
      6c4:	0008                	0x8
      6c6:	0601                	addi	a2,a2,0
     if (val == 0) {
@@ -8895,7 +8895,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      7a8:	0101                	addi	sp,sp,0
      7aa:	0106                	slli	sp,sp,0x1
      7ac:	0000                	unimp
-     7ae:	00480003          	lb	zero,4(a6) # fffeb004 <__stack_top+0xdffcb004>
+     7ae:	00480003          	lb	zero,4(a6) # fffeb004 <__stack_top+0xdffab004>
      7b2:	0000                	unimp
      7b4:	0101                	addi	sp,sp,0
      7b6:	000d0efb          	0xd0efb
@@ -9638,7 +9638,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      e40:	095e                	slli	s2,s2,0x17
      e42:	0000                	unimp
      e44:	0401                	addi	s0,s0,0
-     e46:	09770303          	lb	t1,151(a4) # b097 <__stack_size+0x7097>
+     e46:	09770303          	lb	t1,151(a4) # b097 <__stack_size+0x3097>
      e4a:	0000                	unimp
      e4c:	0501                	addi	a0,a0,0
      e4e:	060c                	addi	a1,sp,768
@@ -9684,7 +9684,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
      eaa:	095d                	addi	s2,s2,23
      eac:	0000                	unimp
      eae:	0401                	addi	s0,s0,0
-     eb0:	096e0303          	lb	t1,150(t3) # 1d096 <__stack_size+0x19096>
+     eb0:	096e0303          	lb	t1,150(t3) # 1d096 <__stack_size+0x15096>
      eb4:	0000                	unimp
      eb6:	0501                	addi	a0,a0,0
      eb8:	0620                	addi	s0,sp,776
@@ -9840,7 +9840,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1024:	097fb503          	0x97fb503
     1028:	0000                	unimp
     102a:	0401                	addi	s0,s0,0
-    102c:	03050503          	lb	a0,48(a0) # fffeb030 <__stack_top+0xdffcb030>
+    102c:	03050503          	lb	a0,48(a0) # fffeb030 <__stack_top+0xdffab030>
     1030:	096a                	slli	s2,s2,0x1a
     1032:	0000                	unimp
     1034:	0501                	addi	a0,a0,0
@@ -9911,7 +9911,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     10d4:	6574                	flw	fa3,76(a0)
     10d6:	2f737473          	csrrci	s0,0x2f7,6
     10da:	6f74                	flw	fa3,92(a4)
-    10dc:	68636c6f          	jal	s8,37762 <__stack_size+0x33762>
+    10dc:	68636c6f          	jal	s8,37762 <__stack_size+0x2f762>
     10e0:	6961                	lui	s2,0x18
     10e2:	2f6e                	fld	ft10,216(sp)
     10e4:	6972                	flw	fs2,28(sp)
@@ -9996,7 +9996,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     11a0:	00097d03          	0x97d03
     11a4:	0100                	addi	s0,sp,128
     11a6:	3405                	jal	bc6 <_data_lma+0x86>
-    11a8:	04090303          	lb	t1,64(s2) # 18040 <__stack_size+0x14040>
+    11a8:	04090303          	lb	t1,64(s2) # 18040 <__stack_size+0x10040>
     11ac:	0100                	addi	s0,sp,128
     11ae:	0505                	addi	a0,a0,1
     11b0:	0200                	addi	s0,sp,256
@@ -10064,7 +10064,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1242:	0901                	addi	s2,s2,0
     1244:	0004                	0x4
     1246:	0501                	addi	a0,a0,0
-    1248:	00030623          	sb	zero,12(t1) # b00c <__stack_size+0x700c>
+    1248:	00030623          	sb	zero,12(t1) # b00c <__stack_size+0x300c>
     124c:	0009                	c.nop	2
     124e:	0100                	addi	s0,sp,128
     1250:	1205                	addi	tp,tp,-31
@@ -10310,7 +10310,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     147c:	090c                	addi	a1,sp,144
     147e:	0004                	0x4
     1480:	0501                	addi	a0,a0,0
-    1482:	09050323          	sb	a6,134(a0) # fffeb086 <__stack_top+0xdffcb086>
+    1482:	09050323          	sb	a6,134(a0) # fffeb086 <__stack_top+0xdffab086>
     1486:	0004                	0x4
     1488:	0501                	addi	a0,a0,0
     148a:	090f0317          	auipc	t1,0x90f0
@@ -10414,7 +10414,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     156c:	0901                	addi	s2,s2,0
     156e:	0008                	0x8
     1570:	0501                	addi	a0,a0,0
-    1572:	00030623          	sb	zero,12(t1) # 90f1496 <__stack_size+0x90ed496>
+    1572:	00030623          	sb	zero,12(t1) # 90f1496 <__stack_size+0x90e9496>
     1576:	0009                	c.nop	2
     1578:	0100                	addi	s0,sp,128
     157a:	0e05                	addi	t3,t3,1
@@ -10541,7 +10541,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1690:	08096603          	0x8096603
     1694:	0100                	addi	s0,sp,128
     1696:	0505                	addi	a0,a0,1
-    1698:	097f9c03          	lh	s8,151(t6) # fffe6097 <__stack_top+0xdffc6097>
+    1698:	097f9c03          	lh	s8,151(t6) # fffe6097 <__stack_top+0xdffa6097>
     169c:	0000                	unimp
     169e:	0401                	addi	s0,s0,0
     16a0:	0302                	c.slli64	t1
@@ -10640,7 +10640,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
     1774:	0101                	addi	sp,sp,0
     1776:	00c0                	addi	s0,sp,68
     1778:	0000                	unimp
-    177a:	003e0003          	lb	zero,3(t3) # 1a003 <__stack_size+0x16003>
+    177a:	003e0003          	lb	zero,3(t3) # 1a003 <__stack_size+0x12003>
     177e:	0000                	unimp
     1780:	0101                	addi	sp,sp,0
     1782:	000d0efb          	0xd0efb
@@ -11100,7 +11100,7 @@ Disassembly of section .debug_str:
     sw      x22, OFF_X(22)(sp)
   ca:	7270                	flw	fa2,100(a2)
     sw      x23, OFF_X(23)(sp)
-  cc:	6172676f          	jal	a4,26ee2 <__stack_size+0x22ee2>
+  cc:	6172676f          	jal	a4,26ee2 <__stack_size+0x1eee2>
     sw      x24, OFF_X(24)(sp)
   d0:	736d                	lui	t1,0xffffb
   d2:	5f736f2f          	0x5f736f2f
@@ -11165,7 +11165,7 @@ Disassembly of section .debug_str:
  130:	676e                	flw	fa4,216(sp)
  132:	6c20                	flw	fs0,88(s0)
     lw      x3,  OFF_X(3)(sp)
- 134:	20676e6f          	jal	t3,7633a <__stack_size+0x7233a>
+ 134:	20676e6f          	jal	t3,7633a <__stack_size+0x6e33a>
     lw      x4,  OFF_X(4)(sp)
  138:	6e75                	lui	t3,0x1d
  13a:	6e676973          	csrrsi	s2,0x6e6,14
@@ -11206,7 +11206,7 @@ Disassembly of section .debug_str:
     lw      x19, OFF_X(19)(sp)
  174:	6c00316b          	0x6c00316b
     lw      x20, OFF_X(20)(sp)
- 178:	20676e6f          	jal	t3,7637e <__stack_size+0x7237e>
+ 178:	20676e6f          	jal	t3,7637e <__stack_size+0x6e37e>
     lw      x21, OFF_X(21)(sp)
  17c:	6f6c                	flw	fa1,92(a4)
  17e:	676e                	flw	fa4,216(sp)
@@ -11242,7 +11242,7 @@ Disassembly of section .debug_str:
  1a8:	7574                	flw	fa3,108(a0)
  1aa:	682f0073          	0x682f0073
     mret
- 1ae:	2f656d6f          	jal	s10,564a4 <__stack_size+0x524a4>
+ 1ae:	2f656d6f          	jal	s10,564a4 <__stack_size+0x4e4a4>
 {
  1b2:	6379                	lui	t1,0x1e
  1b4:	2f78                	fld	fa4,216(a4)
@@ -11252,7 +11252,7 @@ Disassembly of section .debug_str:
  1be:	7570                	flw	fa2,108(a0)
  1c0:	2f77732f          	0x2f77732f
  1c4:	7270                	flw	fa2,100(a2)
- 1c6:	6172676f          	jal	a4,26fdc <__stack_size+0x22fdc>
+ 1c6:	6172676f          	jal	a4,26fdc <__stack_size+0x1efdc>
     for (int i = 0; i < TASK_ITERS; i++) {
  1ca:	736d                	lui	t1,0xffffb
         uart_printf("[task1] iter=%d tick=%u\n", i, timer_count);
@@ -11318,11 +11318,11 @@ Disassembly of section .debug_str:
  242:	2d20                	fld	fs0,88(a0)
     for (int i = 0; i < TASK_ITERS; i++) {
  244:	6e66                	flw	ft8,88(sp)
- 246:	6f632d6f          	jal	s10,3293c <__stack_size+0x2e93c>
+ 246:	6f632d6f          	jal	s10,3293c <__stack_size+0x2a93c>
         task_yield();
  24a:	6d6d                	lui	s10,0x1b
     for (int i = 0; i < TASK_ITERS; i++) {
- 24c:	2d206e6f          	jal	t3,651e <__stack_size+0x251e>
+ 24c:	2d206e6f          	jal	t3,651e <_data_lma+0x59de>
     task_done[0] = 1;
  250:	6666                	flw	fa2,88(sp)
  252:	6e75                	lui	t3,0x1d
@@ -11358,7 +11358,7 @@ Disassembly of section .debug_str:
  28c:	0074                	addi	a3,sp,12
  28e:	6174                	flw	fa3,68(a0)
  290:	645f6b73          	csrrsi	s6,0x645,30
- 294:	00656e6f          	jal	t3,5629a <__stack_size+0x5229a>
+ 294:	00656e6f          	jal	t3,5629a <__stack_size+0x4e29a>
  298:	6175                	addi	sp,sp,368
  29a:	7472                	flw	fs0,60(sp)
  29c:	705f 7475 0073      	0x737475705f
@@ -11391,7 +11391,7 @@ Disassembly of section .debug_str:
  2d8:	2f77732f          	0x2f77732f
     clint_schedule_relative(TICK_INTERVAL_TICKS);
  2dc:	7270                	flw	fa2,100(a2)
- 2de:	6172676f          	jal	a4,270f4 <__stack_size+0x230f4>
+ 2de:	6172676f          	jal	a4,270f4 <__stack_size+0x1f0f4>
     bsp_enable_timer_interrupt();
  2e2:	736d                	lui	t1,0xffffb
     bsp_irq_enable();
@@ -11522,7 +11522,7 @@ Disassembly of section .debug_str:
  3ea:	632e                	flw	ft6,200(sp)
     if (ntasks <= 1) return;
  3ec:	6300                	flw	fs0,0(a4)
- 3ee:	0065646f          	jal	s0,563f4 <__stack_size+0x523f4>
+ 3ee:	0065646f          	jal	s0,563f4 <__stack_size+0x4e3f4>
  3f2:	6c70                	flw	fa2,92(s0)
  3f4:	6369                	lui	t1,0x1a
  3f6:	635f 6d6f 6c70      	0x6c706d6f635f
@@ -11636,7 +11636,7 @@ Disassembly of section .debug_str:
  4aa:	6f6c                	flw	fa1,92(a4)
  4ac:	676e                	flw	fa4,216(sp)
  4ae:	6420                	flw	fs0,72(s0)
- 4b0:	6c62756f          	jal	a0,27b76 <__stack_size+0x23b76>
+ 4b0:	6c62756f          	jal	a0,27b76 <__stack_size+0x1fb76>
     uart_puts("\n[bsp] UNHANDLED TRAP: ");
  4b4:	0065                	c.nop	25
  4b6:	7362                	flw	ft6,56(sp)
@@ -11755,7 +11755,7 @@ void bsp_enable_timer_interrupt(void)    { csr_set(mie, MIE_MTIE); }
             (soft_handler ? soft_handler : default_soft)(f);
  5ac:	2e74                	fld	fa3,216(a2)
  5ae:	682f0053          	0x682f0053
- 5b2:	2f656d6f          	jal	s10,568a8 <__stack_size+0x528a8>
+ 5b2:	2f656d6f          	jal	s10,568a8 <__stack_size+0x4e8a8>
  5b6:	6379                	lui	t1,0x1e
 }
  5b8:	2f78                	fld	fa4,216(a4)

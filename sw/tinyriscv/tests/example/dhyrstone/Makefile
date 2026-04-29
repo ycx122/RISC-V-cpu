@@ -19,5 +19,4 @@ C_SRCS := \
     dhry_stubs.c \
 
 COMMON_DIR = ..
-TOOLCHAIN_DIR = ../..
 include ../common.mk

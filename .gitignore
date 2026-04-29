@@ -9,6 +9,10 @@ sim/output/
 # Build/tmp
 build/
 *.log
+*.dump
+*.verilog
+*.elf
+*.map
 
 # Verilator lint outputs
 obj_dir/
@@ -19,3 +23,6 @@ obj_dir/
 *.swp
 *.swo
 .DS_Store
+
+# TinyRISCV local test artefacts
+sw/tinyriscv/tests/example/*/dhry*

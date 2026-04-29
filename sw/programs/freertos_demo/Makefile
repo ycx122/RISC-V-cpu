@@ -28,18 +28,24 @@ HEAP_DIR  := $(RTOS_DIR)/portable/MemMang
 BUILD_DIR := $(APP_DIR)/build
 
 # --------------------------------------------------------------------
-# Toolchain (same vendored cross-compiler as the rest of sw/)
+# Toolchain (shared: PATH -> vendored fallback)
 # --------------------------------------------------------------------
-RISCV_PATH ?= $(REPO_ROOT)/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14
+include $(REPO_ROOT)/sw/toolchain/riscv_toolchain.mk
 
-RISCV_PREFIX  ?= riscv64-unknown-elf-
-RISCV_GCC     := $(RISCV_PATH)/bin/$(RISCV_PREFIX)gcc
-RISCV_OBJCOPY := $(RISCV_PATH)/bin/$(RISCV_PREFIX)objcopy
-RISCV_OBJDUMP := $(RISCV_PATH)/bin/$(RISCV_PREFIX)objdump
-
-RISCV_ARCH ?= rv32im
+ifeq ($(origin RISCV_ARCH),undefined)
+  _RISCV_ZICSR_OK := $(shell $(RISCV_GCC) -march=rv32im_zicsr_zifencei -mabi=ilp32 -x c -c -o /dev/null - </dev/null 2>/dev/null && echo yes)
+  ifeq ($(_RISCV_ZICSR_OK),yes)
+    RISCV_ARCH := rv32im_zicsr_zifencei
+  else
+    RISCV_ARCH := rv32im
+  endif
+endif
 RISCV_ABI  ?= ilp32
 ARCH_FLAGS := -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI) -mcmodel=medlow
+
+# Apt gcc-riscv64-unknown-elf has no bundled libc headers; picolibc supplies them.
+RV_PICOLIB_PROBE_HEADER := stdlib.h
+include $(REPO_ROOT)/sw/toolchain/riscv_picolib_cc.mk
 
 # --------------------------------------------------------------------
 # Include search paths
@@ -60,7 +66,7 @@ INCLUDES := \
 # --------------------------------------------------------------------
 # Flags
 # --------------------------------------------------------------------
-CFLAGS := $(ARCH_FLAGS) \
+CFLAGS := $(ARCH_FLAGS) $(PICOLIBC_CC_CFLAGS) \
           -Os -g \
           -ffreestanding -fno-builtin -fno-common \
           -ffunction-sections -fdata-sections \

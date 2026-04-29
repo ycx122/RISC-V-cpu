@@ -20,8 +20,12 @@
 # = the directory containing this fragment; both are discovered below
 # so client Makefiles do not need to set them manually.
 #
-# The toolchain path defaults to the vendored tinyriscv GCC 8.3.0; set
-# RISCV_PATH externally if you have a newer cross-compiler installed.
+# Toolchain selection (see "Toolchain" section below):
+#   1. If RISCV_PATH is set explicitly, it is used as-is.
+#   2. Otherwise, prefer riscv64-unknown-elf-gcc on $(PATH) (e.g. apt's
+#      gcc-riscv64-unknown-elf 13.2 on noble/jammy-backports).
+#   3. As a last resort, fall back to the vendored 8.3.0 toolchain that
+#      ships with tinyriscv.
 
 # --------------------------------------------------------------------
 # Directory discovery (APP_DIR = caller's dir, BSP_DIR = this file's dir)
@@ -32,15 +36,9 @@ APP_DIR := $(abspath $(dir $(firstword $(MAKEFILE_LIST))))
 REPO_ROOT ?= $(abspath $(BSP_DIR)/../..)
 
 # --------------------------------------------------------------------
-# Toolchain
+# Toolchain (shared detection: PATH -> vendored fallback)
 # --------------------------------------------------------------------
-RISCV_PATH ?= $(REPO_ROOT)/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14
-
-RISCV_PREFIX    ?= riscv64-unknown-elf-
-RISCV_GCC       := $(RISCV_PATH)/bin/$(RISCV_PREFIX)gcc
-RISCV_AS        := $(RISCV_PATH)/bin/$(RISCV_PREFIX)as
-RISCV_OBJCOPY   := $(RISCV_PATH)/bin/$(RISCV_PREFIX)objcopy
-RISCV_OBJDUMP   := $(RISCV_PATH)/bin/$(RISCV_PREFIX)objdump
+include $(BSP_DIR)/../toolchain/riscv_toolchain.mk
 
 # --------------------------------------------------------------------
 # BSP sources (everything under sw/bsp/src/)
@@ -58,7 +56,21 @@ BSP_LDS   ?= $(BSP_DIR)/ld/default.lds
 # --------------------------------------------------------------------
 # Toolchain flags
 # --------------------------------------------------------------------
-RISCV_ARCH ?= rv32im
+# Some BSP assembly files (start.S, trap_entry.S) use CSR / fence.i
+# instructions. Binutils >= 2.38 (shipped with GCC >= 12) requires the
+# `zicsr` / `zifencei` z-extensions to be listed explicitly in -march;
+# older toolchains -- including the vendored 8.3.0 (binutils 2.32) --
+# reject that spelling. Probe the resolved toolchain once and pick the
+# right default. Callers can still override RISCV_ARCH from the command
+# line.
+ifeq ($(origin RISCV_ARCH),undefined)
+  _RISCV_ZICSR_OK := $(shell $(RISCV_GCC) -march=rv32im_zicsr_zifencei -mabi=ilp32 -x c -c -o /dev/null - </dev/null 2>/dev/null && echo yes)
+  ifeq ($(_RISCV_ZICSR_OK),yes)
+    RISCV_ARCH := rv32im_zicsr_zifencei
+  else
+    RISCV_ARCH := rv32im
+  endif
+endif
 RISCV_ABI  ?= ilp32
 
 ARCH_FLAGS := -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI) -mcmodel=medlow

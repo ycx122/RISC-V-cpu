@@ -41,16 +41,20 @@ done
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd "$script_dir/.." && pwd)
+source "$repo_root/sim/scripts/common.sh"
 
 example_dir="$repo_root/sw/tinyriscv/tests/example/dhyrstone"
-toolbin="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin"
 log_dir="$repo_root/sim/output"
 log_file="$log_dir/dhrystone.log"
 dhrystone_timeout="${DHRYSTONE_TIMEOUT:-45s}"
 
-objcopy_bin="$toolbin/riscv64-unknown-elf-objcopy"
+if ! objcopy_bin=$(find_riscv_tool objcopy); then
+    echo "Missing riscv64-unknown-elf-objcopy" >&2
+    echo "Install via: sudo apt install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf" >&2
+    exit 1
+fi
 
-for required in make "$objcopy_bin" iverilog vvp timeout; do
+for required in make iverilog vvp timeout; do
     if ! command -v "$required" >/dev/null 2>&1; then
         echo "Missing required tool: $required" >&2
         exit 1
@@ -85,7 +89,6 @@ echo "[2/4] Generating ROM image..."
     "$build_dir/dhry.verilog"
 
 echo "[3/4] Compiling Icarus Verilog testbench..."
-source "$repo_root/sim/scripts/common.sh"
 rtl_files=()
 load_filelist "$repo_root/sim/filelist/tb_common.f"
 load_filelist "$repo_root/sim/filelist/rtl_core.f"

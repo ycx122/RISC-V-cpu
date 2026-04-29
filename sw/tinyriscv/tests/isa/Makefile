@@ -6,22 +6,20 @@ XLEN := 32
 
 src_dir := .
 
+REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../..)
+include $(REPO_ROOT)/sw/toolchain/riscv_toolchain.mk
+export RISCV_PREFIX := $(RISCV_GNU_TARGET_PREFIX)
+
 include $(src_dir)/rv32ui/Makefrag
 include $(src_dir)/rv32um/Makefrag
 
 default: all
 
 #--------------------------------------------------------------------
-# Build rules
+# Toolchain (PATH -> vendored); RISCV_PREFIX exported for sub-makes
 #--------------------------------------------------------------------
 
-TOOLCHAIN_ROOT ?= ../toolchain
-RISCV_PREFIX ?= $(abspath $(TOOLCHAIN_ROOT)/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-)
-RISCV_GCC ?= $(RISCV_PREFIX)gcc
 RISCV_GCC_OPTS ?= -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles
-RISCV_OBJDUMP ?= $(RISCV_PREFIX)objdump --disassemble-all
-RISCV_OBJCOPY ?= $(RISCV_PREFIX)objcopy
-
 
 vpath %.S $(src_dir)
 
@@ -29,7 +27,7 @@ vpath %.S $(src_dir)
 # Build assembly tests
 
 %.dump: % 
-	$(RISCV_OBJDUMP) generated/$< > generated/$@
+	$(RISCV_OBJDUMP) --disassemble-all generated/$< > generated/$@
 	$(RISCV_OBJCOPY) -O verilog generated/$<   generated/$<.verilog
 	$(RISCV_OBJCOPY) -O binary generated/$<   generated/$<.bin
 

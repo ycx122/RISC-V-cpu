@@ -27,7 +27,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog verilator gcc-riscv64-unknown-elf vim-common
+          sudo apt-get install -y iverilog verilator gcc-riscv64-unknown-elf \
+            binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf vim-common
 
       - name: make lint
         run: make lint
@@ -52,7 +53,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog verilator gcc-riscv64-unknown-elf vim-common
+          sudo apt-get install -y iverilog verilator gcc-riscv64-unknown-elf \
+            binutils-riscv64-unknown-elf picolibc-riscv64-unknown-elf vim-common
 
       - name: make test (includes isa regression)
         env:

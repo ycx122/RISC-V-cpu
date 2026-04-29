@@ -131,18 +131,13 @@ mkdir -p "$log_dir"
 #
 # The testbench supports a `+DRAM=<byte-hex-file>` plusarg that pre-loads
 # the `.data` segment into simulated RAM (see sim/tb/cpu_test.v).  Extract
-# each test's `.data` bytes from its ELF using the RISC-V objcopy that
-# ships with the vendored toolchain, falling back to the host PATH.  If
-# neither is available, skip the preload (tests that depend on initialized
+# each test's `.data` bytes from its ELF using whichever RISC-V objcopy the
+# `find_riscv_tool` helper resolves (PATH > $RISCV_PATH > vendored 8.3.0).
+# If none is available, skip the preload (tests that depend on initialized
 # `.data`, currently rv32ui-p-s{b,h}, will fail but the rest still run).
-riscv_objcopy="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-objcopy"
-if [[ ! -x "$riscv_objcopy" ]]; then
-    if command -v riscv64-unknown-elf-objcopy >/dev/null 2>&1; then
-        riscv_objcopy=$(command -v riscv64-unknown-elf-objcopy)
-    else
-        echo "[isa] WARN: riscv64-unknown-elf-objcopy not found; skipping +DRAM preload"
-        riscv_objcopy=""
-    fi
+if ! riscv_objcopy=$(find_riscv_tool objcopy); then
+    echo "[isa] WARN: riscv64-unknown-elf-objcopy not found; skipping +DRAM preload"
+    riscv_objcopy=""
 fi
 
 # -------- build simulation once --------------------------------------------

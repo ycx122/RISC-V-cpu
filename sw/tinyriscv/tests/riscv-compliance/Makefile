@@ -1,6 +1,8 @@
 export RISCV_TARGET       ?= tinyriscv
-TOOLCHAIN_ROOT ?= ../toolchain
-export RISCV_PREFIX       ?= $(abspath $(TOOLCHAIN_ROOT)/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-)
+
+REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../..)
+include $(REPO_ROOT)/sw/toolchain/riscv_toolchain.mk
+export RISCV_PREFIX := $(RISCV_GNU_TARGET_PREFIX)
 
 export ROOTDIR    := $(abspath .)
 export TARGETDIR ?= $(ROOTDIR)/riscv-target

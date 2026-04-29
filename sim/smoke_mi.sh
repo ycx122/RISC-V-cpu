@@ -31,17 +31,21 @@ done
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd "$script_dir/.." && pwd)
+source "$repo_root/sim/scripts/common.sh"
 
-toolbin="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin"
 linker_script="$repo_root/sw/tinyriscv/tests/example/d.lds"
 src_file="$repo_root/sim/tests/mi_smoke.S"
 timeout_val="${MI_SMOKE_TIMEOUT:-30s}"
 
-gcc_bin="$toolbin/riscv64-unknown-elf-gcc"
-objcopy_bin="$toolbin/riscv64-unknown-elf-objcopy"
-objdump_bin="$toolbin/riscv64-unknown-elf-objdump"
+if ! gcc_bin=$(find_riscv_tool gcc) \
+   || ! objcopy_bin=$(find_riscv_tool objcopy) \
+   || ! objdump_bin=$(find_riscv_tool objdump); then
+    echo "Missing RISC-V toolchain (riscv64-unknown-elf-gcc et al.)" >&2
+    echo "Install via: sudo apt install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf" >&2
+    exit 1
+fi
 
-for required in "$gcc_bin" "$objcopy_bin" "$objdump_bin" iverilog vvp timeout; do
+for required in iverilog vvp timeout; do
     if ! command -v "$required" >/dev/null 2>&1; then
         echo "Missing required tool: $required" >&2
         exit 1
@@ -55,9 +59,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+march=$(find_riscv_march rv32im)
+
 echo "[1/4] Building M-mode trap smoke program..."
 "$gcc_bin" \
-    -march=rv32im -mabi=ilp32 \
+    -march="$march" -mabi=ilp32 \
     -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles \
     -T "$linker_script" \
     "$src_file" \
@@ -68,7 +74,6 @@ echo "[2/4] Generating ROM image..."
 "$objdump_bin" --disassemble-all "$build_dir/mi_smoke.elf" >"$build_dir/mi_smoke.dump"
 
 echo "[3/4] Compiling Icarus Verilog testbench..."
-source "$repo_root/sim/scripts/common.sh"
 rtl_files=()
 load_filelist "$repo_root/sim/filelist/tb_common.f"
 load_filelist "$repo_root/sim/filelist/rtl_core.f"

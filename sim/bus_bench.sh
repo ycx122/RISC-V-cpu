@@ -11,8 +11,8 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd "$script_dir/.." && pwd)
+source "$repo_root/sim/scripts/common.sh"
 
-toolbin="$repo_root/sw/tinyriscv/tests/toolchain/riscv64-unknown-elf-gcc-8.3.0-2020.04.0-x86_64-linux-ubuntu14/bin"
 linker_script="$repo_root/sw/tinyriscv/tests/example/d.lds"
 src_file="$repo_root/sim/tests/bus_bench.S"
 timeout_val="${BUS_BENCH_TIMEOUT:-60s}"
@@ -21,10 +21,14 @@ timeout_val="${BUS_BENCH_TIMEOUT:-60s}"
 # pretty-print cycles/iter.  Keep in sync with ITER in bus_bench.S.
 iter=5000
 
-gcc_bin="$toolbin/riscv64-unknown-elf-gcc"
-objcopy_bin="$toolbin/riscv64-unknown-elf-objcopy"
+if ! gcc_bin=$(find_riscv_tool gcc) \
+   || ! objcopy_bin=$(find_riscv_tool objcopy); then
+    echo "Missing RISC-V toolchain (riscv64-unknown-elf-gcc et al.)" >&2
+    echo "Install via: sudo apt install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf" >&2
+    exit 1
+fi
 
-for required in "$gcc_bin" "$objcopy_bin" iverilog vvp timeout; do
+for required in iverilog vvp timeout; do
     if ! command -v "$required" >/dev/null 2>&1; then
         echo "Missing required tool: $required" >&2
         exit 1
@@ -34,8 +38,10 @@ done
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/riscv-cpu-bus-bench.XXXXXX")
 trap 'rm -rf "$build_dir"' EXIT
 
+march=$(find_riscv_march rv32im)
+
 echo "[1/4] Building bus microbenchmark..."
-"$gcc_bin" -march=rv32im -mabi=ilp32 \
+"$gcc_bin" -march="$march" -mabi=ilp32 \
     -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles \
     -T "$linker_script" "$src_file" \
     -o "$build_dir/bus_bench.elf"
@@ -43,7 +49,6 @@ echo "[1/4] Building bus microbenchmark..."
 echo "[2/4] Generating ROM image..."
 "$objcopy_bin" -O verilog "$build_dir/bus_bench.elf" "$build_dir/bus_bench.verilog"
 
-source "$repo_root/sim/scripts/common.sh"
 rtl_files=()
 load_filelist "$repo_root/sim/filelist/tb_common.f"
 load_filelist "$repo_root/sim/filelist/rtl_core.f"

@@ -146,18 +146,24 @@ initial begin
     ras_top = {RAS_PTR_W{1'b0}};
 end
 
+// Reset path uses blocking assignment on purpose: Verilator < 5.026 (incl.
+// the 5.020 shipped with Ubuntu 24.04 / our CI) flags array NBA inside a
+// for-loop as %Error-BLKLOOPINIT, while explicitly allowing the same
+// pattern with `=`.  The other branches of this always block are mutually
+// exclusive with the reset branch, so mixing BA/NBA here cannot race.
+/* verilator lint_off BLKANDNBLK */
 always @(posedge clk) begin
     if (!rst_n) begin
         for (i = 0; i < BTB_ENTRIES; i = i + 1) begin
-            btb_valid[i]  <= 1'b0;
-            btb_tag[i]    <= {TAG_W{1'b0}};
-            btb_target[i] <= 32'd0;
-            btb_type[i]   <= 2'd0;
-            bht[i]        <= 2'b01;
+            btb_valid[i]  = 1'b0;
+            btb_tag[i]    = {TAG_W{1'b0}};
+            btb_target[i] = 32'd0;
+            btb_type[i]   = 2'd0;
+            bht[i]        = 2'b01;
         end
         for (i = 0; i < RAS_DEPTH; i = i + 1)
-            ras[i] <= 32'd0;
-        ras_top <= {RAS_PTR_W{1'b0}};
+            ras[i] = 32'd0;
+        ras_top = {RAS_PTR_W{1'b0}};
     end
     else if (upd_valid) begin
         if (u_is_any) begin
@@ -203,5 +209,6 @@ always @(posedge clk) begin
         end
     end
 end
+/* verilator lint_on BLKANDNBLK */
 
 endmodule

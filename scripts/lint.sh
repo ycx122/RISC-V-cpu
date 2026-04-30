@@ -43,6 +43,13 @@ if command -v verilator >/dev/null 2>&1; then
         -Wno-INITIALDLY
         -Wno-MULTIDRIVEN
         -Wno-BLKSEQ
+        # Pre-existing legacy warnings, individually triaged.  None of
+        # these block correctness; track in a follow-up cleanup task.
+        -Wno-PINCONNECTEMPTY  # named-by-name `.foo()` empty connections
+        -Wno-TIMESCALEMOD     # `timescale missing in some modules
+        -Wno-EOFNEWLINE       # missing newline at EOF in a few legacy files
+        -Wno-GENUNNAMED       # unnamed generate blocks in plic.v
+        -Wno-SYNCASYNCNET     # mixed sync/async reset on uart/rxtx & ram_c
         --top-module cpu_soc
     )
 

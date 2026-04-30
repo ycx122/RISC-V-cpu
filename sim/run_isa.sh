@@ -118,9 +118,28 @@ for required in iverilog vvp timeout; do
     fi
 done
 
+# The pre-built image directory is .gitignore'd (see
+# sw/tinyriscv/.gitignore), so on a fresh clone or in CI we have to
+# build the images on the fly.  rv32ui-p-fence_i needs the Zifencei
+# extension which our default `-march=rv32i` build does not enable;
+# `make -k` lets the others finish (fence_i is also in SKIP_LIST so
+# its absence here is harmless).
+isa_make_dir="$repo_root/sw/tinyriscv/tests/isa"
+need_build=0
 if [[ ! -d "$images_dir" ]]; then
-    echo "ISA image directory not found: $images_dir" >&2
-    exit 1
+    need_build=1
+elif ! compgen -G "$images_dir/*.verilog" >/dev/null; then
+    need_build=1
+fi
+if (( need_build )); then
+    echo "[isa] Pre-built images missing under $images_dir; building..."
+    mkdir -p "$images_dir"
+    nproc_count=$(command -v nproc >/dev/null && nproc || echo 4)
+    make -C "$isa_make_dir" -k -j"$nproc_count" || true
+    if ! compgen -G "$images_dir/*.verilog" >/dev/null; then
+        echo "[isa] Build produced no images under $images_dir" >&2
+        exit 1
+    fi
 fi
 
 isa_timeout="${ISA_TIMEOUT:-20s}"

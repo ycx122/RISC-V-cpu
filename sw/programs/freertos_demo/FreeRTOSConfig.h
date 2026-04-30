@@ -8,10 +8,17 @@
  *     mtimecmp at 0x4200_4000 (see sw/bsp/include/bsp/clint.h).
  *   - No F/D/V extensions; RV32IM only; no MPU/PMP.
  *
- * Tick rate is deliberately high (10 kHz) to keep the simulation cycle
- * budget reasonable: one tick == 5 000 cpu_clk cycles, which means a
- * handful of context switches finish in well under 1 M cycles.  A real
- * board can drop this back to 1 kHz without touching anything else.
+ * Tick rate is 10 kHz (one tick == 5 000 cpu_clk cycles).  This keeps
+ * the simulation cycle budget tight while still exercising back-to-back
+ * timer-irq -> context-switch sequences against the dcache/store-buffer
+ * pair.  The earlier hang at 10 kHz turned out to be a store-buffer
+ * push/full race in the dcache: sb_push is registered, so the existing
+ * `~sb_full` gate did not account for the in-flight push that lands the
+ * cycle the new push would have shown up at the SB input port.  Two
+ * back-to-back nc-store decisions could therefore overflow a depth-4
+ * SB, dropping the second store on the floor and corrupting whatever
+ * struct the trap handler was halfway through writing.  Fixed by gating
+ * on `sb_near_full` / `sb_near_empty` (see store_buffer.v + dcache.v).
  */
 
 #ifndef FREERTOS_CONFIG_H

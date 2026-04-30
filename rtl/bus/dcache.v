@@ -361,6 +361,8 @@ module dcache #(
 
     wire        sb_empty;
     wire        sb_full;
+    wire        sb_near_full;
+    wire        sb_near_empty;
 
     store_buffer #(
         .DEPTH (SB_DEPTH)
@@ -384,7 +386,9 @@ module dcache #(
         .snoop_data  (sb_snoop_data),
         .snoop_strb  (sb_snoop_strb),
         .empty       (sb_empty),
-        .full        (sb_full)
+        .full        (sb_full),
+        .near_full   (sb_near_full),
+        .near_empty  (sb_near_empty)
     );
 
     // SB snoop is currently informational (forwarding is unnecessary
@@ -449,8 +453,16 @@ module dcache #(
     wire idle_misalign     = (state == S_IDLE) & up_req & up_misalign;
     wire idle_hit          = (state == S_IDLE) & up_req & ~up_misalign
                            & up_cacheable & hit_match;
+    // sb_near_full (rather than sb_full) is the right gate here: sb_push
+    // is registered, so a "decided this cycle" push only lands at the SB
+    // input on the next clock edge, by which time `occ` already includes
+    // any push that was in flight at the SB port THIS cycle.  Using
+    // sb_full would let two back-to-back nc-store decisions overflow the
+    // buffer when the second one lands, which trips both store_buffer.v's
+    // and dcache.v's `push & full` assertions (PROCESSOR_IMPROVEMENT_PLAN
+    // os_demo SB-overflow regression).
     wire idle_nc_store_ok  = (state == S_IDLE) & up_req & ~up_misalign
-                           & ~up_cacheable & up_ram_we & ~sb_full & ~nc_store_fault;
+                           & ~up_cacheable & up_ram_we & ~sb_near_full & ~nc_store_fault;
 
     // S_BYPASS ack pulse: high for exactly one clock cycle by virtue
     // of the FSM transitioning to S_IDLE on the next edge.
@@ -660,10 +672,15 @@ module dcache #(
                     end
                     else if (up_req & ~up_misalign & up_cacheable
                              & ~hit_match) begin
-                        // Cacheable miss.  If the victim is dirty AND
-                        // the SB isn't empty, spin one cycle so the SB
-                        // can drain to make room for the writeback.
-                        if (~victim_dirty | sb_empty) begin
+                        // Cacheable miss.  If the victim is dirty we need
+                        // the SB to be empty so the four writeback pushes
+                        // fit (DEPTH=4).  sb_near_empty (rather than
+                        // sb_empty) is the right gate: a push in flight
+                        // at the SB input port THIS cycle will land
+                        // before the writeback pushes do, so a "current
+                        // sb_empty=1 but sb_push=1" snapshot would still
+                        // overflow once the WB stream starts.
+                        if (~victim_dirty | sb_near_empty) begin
                             miss_idx       <= up_idx;
                             miss_tag       <= up_tag;
                             miss_addr      <= up_d_addr;
@@ -694,9 +711,13 @@ module dcache #(
                              & ~idle_nc_store_ok) begin
                         // Non-cacheable load OR non-cacheable store
                         // blocked by full SB.  For loads we additionally
-                        // require sb_empty so the bridge sees prior
-                        // MMIO stores in program order.
-                        if (up_ram_re & sb_empty) begin
+                        // require sb_near_empty so the bridge sees prior
+                        // MMIO stores in program order: sb_empty alone
+                        // is misleading when an sb_push from the previous
+                        // cycle is in flight at the SB input port and is
+                        // about to make the SB non-empty before the
+                        // BYPASS load reaches the bridge.
+                        if (up_ram_re & sb_near_empty) begin
                             miss_idx       <= up_idx;
                             miss_tag       <= up_tag;
                             miss_addr      <= up_d_addr;

@@ -87,7 +87,21 @@ module store_buffer #(
 
     // ---- Status -----------------------------------------------------------
     output wire        empty,
-    output wire        full
+    output wire        full,
+    // Predictive flags accounting for the push/pop currently asserted on
+    // the input ports.  Useful for upstream logic (dcache.v) that holds
+    // its `push` request as a registered signal: by the cycle the push
+    // actually lands, occ has already advanced by the in-flight push, so
+    // the upstream cannot rely on `full` alone when deciding whether it
+    // is safe to assert a *new* push next cycle.
+    //
+    //   near_full  = occ_next == DEPTH   ("after the in-flight push lands
+    //                                      and any current pop drains, no
+    //                                      slot remains")
+    //   near_empty = occ_next == 0       ("after the in-flight push and
+    //                                      pop settle, the SB is empty")
+    output wire        near_full,
+    output wire        near_empty
 );
 
     // log2(DEPTH); for DEPTH=4 this is 2.  Index registers are PTR_W bits
@@ -170,6 +184,20 @@ module store_buffer #(
     assign empty     = (occ == {(PTR_W+1){1'b0}});
     assign full      = (occ == DEPTH[PTR_W:0]);
     assign push_full = full;
+
+    // occ_next models the value `occ` will take on the next clock edge if
+    // the currently-presented push/pop hold steady through to that edge.
+    // `push & ~full` mirrors the seq logic above (a push into a full SB
+    // is a no-op as far as occupancy is concerned), and `pop & head_valid`
+    // mirrors the pop guard.  Width matches occ exactly so the equality
+    // tests below stay exact.
+    wire push_eff = push & ~full;
+    wire pop_eff  = pop  & head_valid;
+    wire [PTR_W:0] occ_next = occ
+                             + {{PTR_W{1'b0}}, push_eff}
+                             - {{PTR_W{1'b0}}, pop_eff };
+    assign near_full  = (occ_next == DEPTH[PTR_W:0]);
+    assign near_empty = (occ_next == {(PTR_W+1){1'b0}});
 
     // Snoop: walk the FIFO from oldest (rd_ptr) to newest (wr_ptr-1).
     // Newer entries override older ones on overlapping byte lanes, so we
